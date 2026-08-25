@@ -10,7 +10,6 @@
     "created_at",
     "default_timezone",
     "forecaster",
-    "coverage",
     "publication",
     "platforms",
     "questions"
@@ -47,9 +46,6 @@
     },
     "forecaster": {
       "$ref": "#/$defs/forecaster"
-    },
-    "coverage": {
-      "$ref": "#/$defs/coverage"
     },
     "publication": {
       "$ref": "#/$defs/publication"
@@ -260,105 +256,6 @@
             }
           },
           "required": ["members"]
-        }
-      ]
-    },
-    "externalQuestionSet": {
-      "type": "object",
-      "required": ["name", "url"],
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "version": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "coverageAudit": {
-      "type": "object",
-      "required": ["auditor", "audited_at", "report_url"],
-      "additionalProperties": false,
-      "properties": {
-        "auditor": {
-          "type": "string",
-          "minLength": 1
-        },
-        "audited_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "report_url": {
-          "type": "string",
-          "format": "uri"
-        }
-      }
-    },
-    "coverage": {
-      "type": "object",
-      "required": ["selection_method", "policy", "starts_at", "completeness_claim"],
-      "additionalProperties": false,
-      "properties": {
-        "selection_method": {
-          "enum": ["all_forecasts", "external_question_set", "declared_scope"]
-        },
-        "policy": {
-          "type": "string",
-          "minLength": 1,
-          "description": "A falsifiable inclusion policy describing which forecasts must enter this ledger."
-        },
-        "starts_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "ends_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "completeness_claim": {
-          "enum": ["none", "policy_complete", "externally_audited"]
-        },
-        "external_question_sets": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/externalQuestionSet"
-          }
-        },
-        "audit": {
-          "$ref": "#/$defs/coverageAudit"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "selection_method": {
-                "const": "external_question_set"
-              }
-            },
-            "required": ["selection_method"]
-          },
-          "then": {
-            "required": ["external_question_sets"]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "completeness_claim": {
-                "const": "externally_audited"
-              }
-            },
-            "required": ["completeness_claim"]
-          },
-          "then": {
-            "required": ["audit"]
-          }
         }
       ]
     },

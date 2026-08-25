@@ -15,10 +15,7 @@ never mixes independent track records.
 3. **Separate source facts from derived metrics.** Outcomes and their evidence
    are stored. Brier scores, calibration curves, lifecycle age, and rankings are
    computed by consumers.
-4. **Make coverage claims falsifiable.** `coverage.policy` states which
-   forecasts must enter the ledger. Cryptography detects alteration of recorded
-   forecasts; it cannot prove that an unrecorded forecast never existed.
-5. **Use exact quantitative encodings.** Probabilities are integer basis points
+4. **Use exact quantitative encodings.** Probabilities are integer basis points
    and numeric quantities are exact decimal strings. Floating-point JSON values
    are not used in forecast commitments.
 
@@ -29,7 +26,6 @@ never mixes independent track records.
 | `schema_version` | Exact contract version. v1 requires `1.0.0`. |
 | `ledger_id` | Stable identifier for this track record. |
 | `forecaster` | One individual or team identity. |
-| `coverage` | Inclusion policy and the strength of the completeness claim. |
 | `publication` | Git repository and ledger location. |
 | `platforms` | Reusable platform/account registry. |
 | `questions` | Questions, forecast updates, and eventual resolutions. |
@@ -39,24 +35,6 @@ never mixes independent track records.
 `forecaster.kind` is either `individual` or `team`. A team has at least two
 members, but the team remains one scoring identity. Optional Ed25519 public keys
 support long-lived signatures when GitHub account ownership is not sufficient.
-
-## Coverage
-
-`selection_method` declares how questions enter the ledger:
-
-- `all_forecasts`: every professional quantitative forecast by the identity;
-- `external_question_set`: every question from named external sets;
-- `declared_scope`: every forecast satisfying the written policy.
-
-`completeness_claim` is deliberately explicit:
-
-- `none`: no claim beyond the records shown;
-- `policy_complete`: the forecaster claims compliance with the policy;
-- `externally_audited`: a third-party report is linked.
-
-Neither Git nor a timestamp proves that forecasts omitted before recording do
-not exist. External question pools or organizational controls are required for
-stronger completeness.
 
 ## Questions and lifecycle
 

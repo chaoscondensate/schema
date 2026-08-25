@@ -21,12 +21,6 @@
       }
     ]
   },
-  "coverage": {
-    "selection_method": "all_forecasts",
-    "policy": "Every quantitative forecast made professionally by Alex on or after 2026-08-01 is recorded before its question closes.",
-    "starts_at": "2026-08-01T00:00:00+01:00",
-    "completeness_claim": "policy_complete"
-  },
   "publication": {
     "history": "git",
     "repository_url": "https://github.com/chaoscondensate/schema",

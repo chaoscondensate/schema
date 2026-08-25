@@ -2,9 +2,8 @@
 
 Forecast Ledger is an open JSON Schema for recording quantitative forecasts as
 a durable, independently verifiable track record. It supports one individual or
-team forecasting identity, forecast updates, outcome evidence, declared coverage
-policies, Git history, OpenTimestamps receipts, and encrypted forecasts that can
-be revealed later.
+team forecasting identity, forecast updates, outcome evidence, Git history,
+OpenTimestamps receipts, and encrypted forecasts that can be revealed later.
 
 The project exists because a useful forecasting record must answer more than
 "what probability do you remember assigning?" It should make the original
@@ -21,11 +20,6 @@ When the documented workflow is followed, a verifier can establish:
   external anchor;
 - that a revealed private forecast matches its original sealed commitment;
 - how the question resolved and which external sources support the outcome.
-
-It does **not** prove that the ledger contains every forecast ever considered.
-The `coverage` object makes the inclusion policy and completeness claim explicit;
-external question sets, organizational controls, or audits are needed to support
-strong completeness claims.
 
 ## Current contract
 
@@ -83,12 +77,6 @@ forecaster:
   id: example-forecaster
   kind: individual
   name: Example Forecaster
-
-coverage:
-  selection_method: all_forecasts
-  policy: Every professional quantitative forecast is recorded before its question closes.
-  starts_at: "2026-08-25T00:00:00+01:00"
-  completeness_claim: policy_complete
 
 publication:
   history: git

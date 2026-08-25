@@ -171,12 +171,6 @@ def check_semantics(
         "$.forecaster.signing_keys",
     )
 
-    coverage = ledger["coverage"]
-    if coverage.get("ends_at") and parse_time(coverage["starts_at"]) > parse_time(
-        coverage["ends_at"]
-    ):
-        problems.add("$.coverage", "starts_at must not be later than ends_at")
-
     question_ids = [question["id"] for question in ledger["questions"]]
     problems.unique(question_ids, "$.questions")
     platform_ids = set(ledger["platforms"])

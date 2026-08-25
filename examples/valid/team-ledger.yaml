@@ -21,12 +21,6 @@ forecaster:
       name: Sam Example
       role: Domain specialist
 
-coverage:
-  selection_method: declared_scope
-  policy: Every forecast approved at the team's weekly forecasting meeting is recorded in this ledger.
-  starts_at: "2026-08-01T00:00:00+01:00"
-  completeness_claim: policy_complete
-
 publication:
   history: git
   repository_url: https://github.com/chaoscondensate/schema
