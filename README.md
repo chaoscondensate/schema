@@ -172,6 +172,9 @@ The deterministic test vector deliberately includes the byte that broke the old
 delimiter-based design. See the complete
 [cryptographic verification specification](docs/cryptographic-verification.md).
 
+For the exact public, sealed, reveal, and independent-verifier call order, read
+the [forecast recording and verification workflows](docs/forecast-verification-workflows.md).
+
 ## Repository layout
 
 ```text

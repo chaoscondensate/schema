@@ -166,11 +166,6 @@ def check_semantics(
         problems.unique(
             [member["id"] for member in forecaster["members"]], "$.forecaster.members"
         )
-    problems.unique(
-        [key["id"] for key in forecaster.get("signing_keys", [])],
-        "$.forecaster.signing_keys",
-    )
-
     question_ids = [question["id"] for question in ledger["questions"]]
     problems.unique(question_ids, "$.questions")
     platform_ids = set(ledger["platforms"])

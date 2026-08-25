@@ -4,6 +4,9 @@ This document is normative for `forecast-envelope/v1` and
 `forecast-seal/v1`. The reference implementation is
 [`tools/forecast_crypto.py`](../tools/forecast_crypto.py).
 
+For the end-to-end invocation order and independent verifier checklist, see
+[`forecast-verification-workflows.md`](forecast-verification-workflows.md).
+
 ## Security goals
 
 The protocol provides:
@@ -16,9 +19,9 @@ The protocol provides:
   receipts are downloaded.
 
 It does not prove authorship by itself, guarantee that the ledger is complete,
-or prove that a self-reported `forecasted_at` is exact. Git account ownership,
-signed commits, organizational controls, and external question sets address
-those separate concerns.
+or prove that a self-reported `forecasted_at` is exact. Forecast Ledger v1 does
+not define a cryptographic authorship protocol. A timestamp, commitment hash, or
+valid decryption is not a signature.
 
 ## Canonicalization
 

@@ -33,8 +33,7 @@ never mixes independent track records.
 ## Forecaster identity
 
 `forecaster.kind` is either `individual` or `team`. A team has at least two
-members, but the team remains one scoring identity. Optional Ed25519 public keys
-support long-lived signatures when GitHub account ownership is not sufficient.
+members, but the team remains one scoring identity.
 
 ## Questions and lifecycle
 
@@ -83,4 +82,6 @@ quantile structure as numeric forecasts.
   mirror is checked against decryption.
 
 See [cryptographic-verification.md](cryptographic-verification.md) for the seal
-and timestamp protocols.
+and timestamp protocols. See
+[forecast-verification-workflows.md](forecast-verification-workflows.md) for
+the complete author and verifier call order.

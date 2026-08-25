@@ -26,7 +26,6 @@ publication:
   repository_url: https://github.com/chaoscondensate/schema
   default_branch: main
   ledger_path: team-ledger.yaml
-  commit_signing: ssh
 
 platforms: {}
 

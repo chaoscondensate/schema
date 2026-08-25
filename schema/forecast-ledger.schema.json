@@ -176,30 +176,6 @@
         }
       }
     },
-    "signingKey": {
-      "type": "object",
-      "required": ["id", "type", "public_key", "valid_from"],
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "type": {
-          "const": "ed25519"
-        },
-        "public_key": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_-]{43}$",
-          "description": "Unpadded base64url encoding of a 32-byte Ed25519 public key."
-        },
-        "valid_from": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "revoked_at": {
-          "$ref": "#/$defs/timestamp"
-        }
-      }
-    },
     "forecaster": {
       "type": "object",
       "required": ["id", "kind", "name"],
@@ -229,12 +205,6 @@
           "minItems": 2,
           "items": {
             "$ref": "#/$defs/member"
-          }
-        },
-        "signing_keys": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/signingKey"
           }
         }
       },
@@ -277,9 +247,6 @@
         },
         "ledger_path": {
           "$ref": "#/$defs/relativePath"
-        },
-        "commit_signing": {
-          "enum": ["none", "ssh", "gpg", "sigstore"]
         }
       }
     },
