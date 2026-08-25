@@ -35,10 +35,10 @@ strong completeness claims.
 - Sealed forecasts: `forecast-seal/v1`
 - Timestamp target: `forecast-envelope/v1`
 - Permanent schema ID:
-  `https://chaoscondensate.github.io/schema/v1/forecast-ledger.schema.json`
+  `https://raw.githubusercontent.com/chaoscondensate/schema/v1.0.0/schema/forecast-ledger.schema.json`
 
-The schema ID is derived from this repository's configured
-`chaoscondensate/schema` GitHub remote. Never change a released schema in place.
+The schema ID points to the immutable `v1.0.0` Git tag in this repository. Never
+move a release tag or change a released schema in place.
 
 ## Quick start
 
@@ -73,7 +73,7 @@ python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.jso
 ## Minimal structure
 
 ```yaml
-$schema: https://chaoscondensate.github.io/schema/v1/forecast-ledger.schema.json
+$schema: https://raw.githubusercontent.com/chaoscondensate/schema/v1.0.0/schema/forecast-ledger.schema.json
 schema_version: 1.0.0
 ledger_id: example-forecaster
 created_at: "2026-08-25T10:00:00+01:00"
@@ -199,10 +199,9 @@ tools/forecast_crypto.py   Seal, reveal, and canonicalization reference
 
 ## Publishing and versioning
 
-The first public release should be tagged `v1.0.0` and published as an immutable
-GitHub release. Release assets should include the schema, examples, documentation,
-and a checksum manifest. GitHub Pages should serve the exact schema bytes at its
-permanent `$id` URL.
+The first public release is tagged `v1.0.0` and published as an immutable GitHub
+release. Release assets include the schema, examples, documentation, and a
+checksum manifest. The schema `$id` resolves directly to the tagged source file.
 
 Each released schema requires its exact `schema_version`. A breaking contract
 change receives a new major version and a new permanent URL. Released files are
