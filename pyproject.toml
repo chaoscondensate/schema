@@ -1,0 +1,14 @@
+[project]
+name = "forecast-ledger-schema"
+version = "1.0.0"
+description = "Schema, validator, and cryptographic reference for verifiable quantitative forecast ledgers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

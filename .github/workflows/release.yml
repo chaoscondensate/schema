@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Verify release candidate
+        run: |
+          check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
+          python tools/run_fixture_tests.py
+          python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
+          ruff check tools
+
+      - name: Build release archive and checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          tar -czf "dist/forecast-ledger-schema-${RELEASE_TAG}.tar.gz" \
+            schema examples docs tests tools README.md LICENSE CONTRIBUTING.md SECURITY.md
+          cd dist
+          sha256sum "forecast-ledger-schema-${RELEASE_TAG}.tar.gz" > SHA256SUMS
+
+      - name: Publish immutable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "${RELEASE_TAG}" \
+            --verify-tag \
+            --generate-notes \
+            --title "Forecast Ledger ${RELEASE_TAG}" \
+            dist/forecast-ledger-schema-"${RELEASE_TAG}".tar.gz \
+            dist/SHA256SUMS

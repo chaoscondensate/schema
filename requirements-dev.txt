@@ -1,0 +1,5 @@
+check-jsonschema>=0.36,<1
+cryptography>=46,<47
+jsonschema[format]>=4.26,<5
+ruamel.yaml>=0.18,<0.19
+ruff>=0.12,<1

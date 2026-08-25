@@ -1,0 +1,41 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install validation dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Validate JSON Schema meta-schema
+        run: check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
+
+      - name: Run valid and invalid fixtures
+        run: python tools/run_fixture_tests.py
+
+      - name: Verify cryptographic test vector
+        run: python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
+
+      - name: Lint reference tools
+        run: ruff check tools
+
+      - name: Compile reference tools
+        run: python -m compileall -q tools
