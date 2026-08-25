@@ -111,5 +111,36 @@
       }
     ],
     "expect_contains": "does not match the decrypted sealed bundle"
+  },
+  {
+    "name": "unsupported-rfc3161-timestamp",
+    "base": "examples/valid/individual-ledger.json",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/questions/0/forecasts/0/integrity",
+        "value": {
+          "status": "pending",
+          "target": {
+            "scope": "forecast-envelope/v1",
+            "canonicalization": "RFC8785",
+            "artifact_path": "proofs/targets/f-central-bank-cut-001.json",
+            "digest": {
+              "algorithm": "sha-256",
+              "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "timestamps": [
+            {
+              "type": "rfc3161",
+              "response_path": "proofs/targets/f-central-bank-cut-001.tsr",
+              "tsa_url": "https://tsa.example.com/",
+              "state": "pending"
+            }
+          ]
+        }
+      }
+    ],
+    "expect_contains": "$.questions[0].forecasts[0].integrity"
   }
 ]

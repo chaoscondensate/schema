@@ -587,46 +587,6 @@
         "required": ["anchored_before", "bitcoin_block_height"]
       }
     },
-    "rfc3161Timestamp": {
-      "type": "object",
-      "required": ["type", "response_path", "tsa_url", "state"],
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "rfc3161"
-        },
-        "response_path": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "tsa_url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "state": {
-          "enum": ["pending", "verified"]
-        },
-        "generated_at": {
-          "$ref": "#/$defs/timestamp"
-        }
-      },
-      "if": {
-        "properties": {
-          "state": {
-            "const": "verified"
-          }
-        },
-        "required": ["state"]
-      },
-      "then": {
-        "required": ["generated_at"]
-      }
-    },
-    "timestampProof": {
-      "oneOf": [
-        { "$ref": "#/$defs/otsTimestamp" },
-        { "$ref": "#/$defs/rfc3161Timestamp" }
-      ]
-    },
     "externalAnchor": {
       "type": "object",
       "required": ["kind", "value"],
@@ -673,18 +633,8 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "#/$defs/timestampProof"
-          },
-          "contains": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "const": "opentimestamps"
-              }
-            },
-            "required": ["type"]
-          },
-          "minContains": 1
+            "$ref": "#/$defs/otsTimestamp"
+          }
         },
         "external_anchors": {
           "type": "array",
@@ -709,7 +659,7 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "#/$defs/timestampProof"
+            "$ref": "#/$defs/otsTimestamp"
           },
           "contains": {
             "type": "object",
@@ -754,7 +704,7 @@
         "timestamps": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/timestampProof"
+            "$ref": "#/$defs/otsTimestamp"
           }
         }
       }

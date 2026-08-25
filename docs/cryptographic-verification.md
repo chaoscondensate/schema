@@ -162,9 +162,7 @@ Set the OTS state to `confirmed`, record the reported upper time bound and block
 height, and set integrity to `verified`. The validator rejects a verified
 forecast whose confirmed timestamp does not predate a known outcome.
 
-An RFC 3161 receipt may be stored alongside OTS for immediate independent
-timestamping. OTS remains mandatory for `pending` and `verified` integrity
-states in v1.
+OpenTimestamps is the only timestamp protocol supported by v1.
 
 Keep target artifacts and timestamp receipts permanently and replicate them
 outside the Git repository. A receipt without its exact target is insufficient.

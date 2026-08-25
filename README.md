@@ -150,8 +150,7 @@ Read the full [data model guide](docs/data-model.md).
 7. Run `ots upgrade` and `ots verify` after confirmation, then record the verified
    upper time bound and Bitcoin block height.
 
-RFC 3161 receipts may be added as an immediate second witness. OTS is mandatory
-for anchored v1 records because it provides a long-lived Bitcoin-backed proof.
+OpenTimestamps is the only timestamp protocol supported by v1.
 
 ## Sealed forecasts
 
