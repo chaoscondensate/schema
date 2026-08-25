@@ -21,12 +21,6 @@ forecaster:
       name: Sam Example
       role: Domain specialist
 
-publication:
-  history: git
-  repository_url: https://github.com/chaoscondensate/schema
-  default_branch: main
-  ledger_path: team-ledger.yaml
-
 platforms: {}
 
 questions:

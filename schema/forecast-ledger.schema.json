@@ -10,7 +10,6 @@
     "created_at",
     "default_timezone",
     "forecaster",
-    "publication",
     "platforms",
     "questions"
   ],
@@ -48,7 +47,8 @@
       "$ref": "#/$defs/forecaster"
     },
     "publication": {
-      "$ref": "#/$defs/publication"
+      "$ref": "#/$defs/publication",
+      "description": "Optional Git publication metadata for locating the ledger repository and path."
     },
     "platforms": {
       "type": "object",

@@ -78,12 +78,6 @@ forecaster:
   kind: individual
   name: Example Forecaster
 
-publication:
-  history: git
-  repository_url: https://github.com/chaoscondensate/schema
-  default_branch: main
-  ledger_path: ledger.yaml
-
 platforms: {}
 questions:
   - id: q-example

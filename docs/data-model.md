@@ -26,7 +26,7 @@ never mixes independent track records.
 | `schema_version` | Exact contract version. v1 requires `1.0.0`. |
 | `ledger_id` | Stable identifier for this track record. |
 | `forecaster` | One individual or team identity. |
-| `publication` | Git repository and ledger location. |
+| `publication` | Optional Git repository and ledger location. |
 | `platforms` | Reusable platform/account registry. |
 | `questions` | Questions, forecast updates, and eventual resolutions. |
 
