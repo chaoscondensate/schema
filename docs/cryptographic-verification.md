@@ -13,10 +13,10 @@ The protocol provides:
 
 - content binding: a recorded forecast cannot be opened as another forecast;
 - hiding: a sealed forecast and its reasoning remain confidential until reveal;
-- existence timing: a timestamp proves that a precise envelope existed no later
-  than the timestamp's external anchor;
-- portable verification: the Git host is not required once artifacts and
-  receipts are downloaded.
+- existence timing: a trusted TSA signs the digest of a precise envelope and
+  records its RFC 3161 `genTime`;
+- portable verification: the Git host is not required once artifacts, RFC 3161
+  responses, requests, and trust anchors are downloaded.
 
 It does not prove authorship by itself, guarantee that the ledger is complete,
 or prove that a self-reported `forecasted_at` is exact. Forecast Ledger v1 does
@@ -58,7 +58,7 @@ For a public forecast, canonicalize this object:
 ```
 
 Include every present immutable forecast statement field listed by
-`public_forecast_envelope()`. Exclude `integrity`; adding a receipt after
+`public_forecast_envelope()`. Exclude `integrity`; adding timestamp metadata after
 timestamping must not make the target recursive.
 
 ## Sealed forecast protocol
@@ -133,7 +133,7 @@ Retain the original commitment and ciphertext. A verifier:
 3. verifies `SHA-256(plaintext) == C`;
 4. checks scheme, question ID, and forecast ID;
 5. checks that the public plaintext mirror equals the decrypted bundle;
-6. verifies the timestamp target and receipt.
+6. verifies the timestamp target and RFC 3161 response.
 
 ## Timestamp workflow
 
@@ -144,28 +144,59 @@ python tools/build_targets.py ledger.yaml --output proofs/targets
 ```
 
 For each report entry, copy the artifact path and digest into `integrity.target`.
-Then create an OpenTimestamps receipt:
+Create an RFC 3161 request over the exact target using SHA-256:
 
 ```bash
-ots stamp proofs/targets/f-example-001.json
+mkdir -p proofs/timestamps
+openssl ts -query \
+  -data proofs/targets/f-example-001.json \
+  -sha256 -cert \
+  -out proofs/timestamps/f-example-001.tsq
 ```
 
-Set `integrity.status` to `pending` and record the `.ots` receipt. After Bitcoin
-confirmation:
+Send the binary request to a Time Stamping Authority and retain its binary
+response:
 
 ```bash
-ots upgrade proofs/targets/f-example-001.json.ots
-ots verify proofs/targets/f-example-001.json.ots
+curl --fail --silent --show-error \
+  -H "Content-Type: application/timestamp-query" \
+  --data-binary @proofs/timestamps/f-example-001.tsq \
+  "$TSA_URL" \
+  --output proofs/timestamps/f-example-001.tsr
 ```
 
-Set the OTS state to `confirmed`, record the reported upper time bound and block
-height, and set integrity to `verified`. The validator rejects a verified
-forecast whose confirmed timestamp does not predate a known outcome.
+Verify the response using the exact request and a retained CA bundle, then
+inspect the signed token metadata:
 
-OpenTimestamps is the only timestamp protocol supported by v1.
+```bash
+openssl ts -verify \
+  -queryfile proofs/timestamps/f-example-001.tsq \
+  -in proofs/timestamps/f-example-001.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
+openssl ts -verify \
+  -data proofs/targets/f-example-001.json \
+  -in proofs/timestamps/f-example-001.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
+openssl ts -reply -in proofs/timestamps/f-example-001.tsr -text
+```
 
-Keep target artifacts and timestamp receipts permanently and replicate them
-outside the Git repository. A receipt without its exact target is insufficient.
+The first verification binds the response to the saved request and its nonce.
+The second binds the response message imprint to the exact target bytes. Both
+must succeed.
+
+Record the request and response paths, TSA URL, CA bundle path, `gen_time`,
+policy OID, and serial number. Set the timestamp state and integrity status to
+`verified` only after the OpenSSL verification succeeds. The semantic validator
+requires at least one verified RFC 3161 `gen_time` to predate a known outcome.
+It validates the declared metadata and chronology but does not parse or verify
+the binary `.tsr`; independent verification must run the command above.
+
+RFC 3161 is the only timestamp protocol supported by `1.2.0`. Multiple timestamp
+objects may retain independent responses from multiple TSAs.
+
+Keep target artifacts and timestamp evidence permanently and replicate them
+outside the Git repository. Keep the `.tsq`, `.tsr`, and CA bundle with the exact
+target; none is sufficient alone for portable verification.
 
 ## Test vector
 

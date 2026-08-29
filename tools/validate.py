@@ -245,16 +245,17 @@ def check_semantics(
                 integrity = forecast["integrity"]
                 if integrity["status"] != "verified":
                     continue
-                for proof_index, proof in enumerate(integrity["timestamps"]):
-                    if (
-                        proof["type"] == "opentimestamps"
-                        and proof["state"] == "confirmed"
-                        and parse_time(proof["anchored_before"]) >= known_at
-                    ):
-                        problems.add(
-                            f"{qpath}.forecasts[{forecast_index}].integrity.timestamps[{proof_index}]",
-                            "timestamp does not predate the known outcome",
-                        )
+                verified_times = [
+                    parse_time(proof["gen_time"])
+                    for proof in integrity["timestamps"]
+                    if proof["type"] == "rfc3161" and proof["state"] == "verified"
+                ]
+                if not any(gen_time < known_at for gen_time in verified_times):
+                    problems.add(
+                        f"{qpath}.forecasts[{forecast_index}].integrity.timestamps",
+                        "must contain a verified RFC 3161 timestamp "
+                        "that predates the known outcome",
+                    )
 
     problems.unique(global_forecast_ids, "$.questions[*].forecasts")
 

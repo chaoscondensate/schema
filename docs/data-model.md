@@ -23,7 +23,7 @@ never mixes independent track records.
 
 | Field | Purpose |
 | --- | --- |
-| `schema_version` | Exact contract version. This release requires `1.1.0`. |
+| `schema_version` | Exact contract version. This release requires `1.2.0`. |
 | `ledger_id` | Stable identifier for this track record. |
 | `forecaster` | One individual or team identity. |
 | `publication` | Optional Git repository and ledger location. |

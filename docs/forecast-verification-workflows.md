@@ -14,7 +14,7 @@ check does not imply that the other claims are true.
 | --- | --- | --- |
 | JSON Schema and semantic validation | The ledger is structurally and internally consistent | Historical existence or truth |
 | SHA-256 target digest | The committed target bytes have not changed | When they existed |
-| OpenTimestamps receipt | The exact target existed no later than a Bitcoin-backed upper time bound | Truth of the forecast or outcome |
+| RFC 3161 response | A TSA signed the exact target digest at its declared `genTime` | Truth of the forecast, outcome, or TSA clock |
 | `forecast-seal/v1` | Hidden content is confidential and cannot be substituted at reveal | Existence before an external anchor |
 | Git history | Publication history and the sequence of repository changes | An independently trusted timestamp |
 | Resolution sources | Evidence for the recorded outcome | Historical existence of the forecast |
@@ -25,8 +25,8 @@ The complete public-forecast evidence chain is:
 forecast fields
     -> canonical forecast-envelope/v1 target
     -> SHA-256 target digest
-    -> OpenTimestamps receipt
-    -> Git commit containing ledger + target + receipt
+    -> RFC 3161 request and TSA response
+    -> Git commit containing ledger + target + timestamp artifacts
     -> later outcome record and resolution sources
 ```
 
@@ -62,13 +62,15 @@ For every anchored forecast, retain all of the following:
 
 - the ledger file;
 - `proofs/targets/<forecast-id>.json`;
-- the matching `.ots` receipt;
-- the Git commit containing the ledger, target, and receipt;
+- the matching `.tsq` request and `.tsr` response for every TSA;
+- the CA bundle needed to verify every retained response;
+- the Git commit containing the ledger, target, requests, responses, and CA bundle;
 - for sealed forecasts, the original commitment and ciphertext;
 - after reveal, the disclosed key and plaintext mirror.
 
-A receipt without its target is insufficient. A target without a receipt proves
-content equality but not historical existence.
+A timestamp response without its exact request and target is insufficient. A
+target without a valid TSA response proves content equality but not historical
+existence.
 
 ## Public forecast: recording workflow
 
@@ -99,15 +101,29 @@ The command writes one RFC 8785 canonical `forecast-envelope/v1` artifact per
 forecast and prints its SHA-256 digest. Copy the reported path and digest into
 `forecast.integrity.target`.
 
-### 4. Request the timestamp
+### 4. Create the timestamp request
 
 ```bash
-ots stamp proofs/targets/<forecast-id>.json
+mkdir -p proofs/timestamps
+openssl ts -query \
+  -data proofs/targets/<forecast-id>.json \
+  -sha256 -cert \
+  -out proofs/timestamps/<forecast-id>.tsq
 ```
 
-This creates `proofs/targets/<forecast-id>.json.ots`. Record the receipt as an
-OpenTimestamps proof with `state: pending`, and set the forecast integrity status
-to `pending`.
+The `.tsq` contains the SHA-256 message imprint and requests the TSA signing
+certificate. Send it as binary data to the TSA and retain the response:
+
+```bash
+curl --fail --silent --show-error \
+  -H "Content-Type: application/timestamp-query" \
+  --data-binary @proofs/timestamps/<forecast-id>.tsq \
+  "$TSA_URL" \
+  --output proofs/timestamps/<forecast-id>.tsr
+```
+
+Before independent verification is complete, record both artifacts with
+`state: pending` and set the forecast integrity status to `pending`.
 
 ```yaml
 integrity:
@@ -120,8 +136,11 @@ integrity:
       algorithm: sha-256
       value: <64-lowercase-hex-characters>
   timestamps:
-    - type: opentimestamps
-      proof_path: proofs/targets/<forecast-id>.json.ots
+    - type: rfc3161
+      request_path: proofs/timestamps/<forecast-id>.tsq
+      response_path: proofs/timestamps/<forecast-id>.tsr
+      tsa_url: https://tsa.example.com/
+      hash_algorithm: sha256
       state: pending
 ```
 
@@ -132,34 +151,73 @@ python tools/validate.py ledger.yaml
 ```
 
 The timestamp target deliberately excludes `integrity`, so adding the target and
-receipt metadata does not recursively change the bytes being timestamped.
+timestamp metadata does not recursively change the bytes being timestamped.
 
-### 6. Commit and publish the complete evidence set
+### 6. Verify the TSA response
 
-Stage the ledger, exact target, and receipt together:
+Retain the TSA trust chain in a PEM CA bundle and verify against the exact
+request:
 
 ```bash
-git add ledger.yaml proofs/targets/<forecast-id>.json proofs/targets/<forecast-id>.json.ots
+openssl ts -verify \
+  -queryfile proofs/timestamps/<forecast-id>.tsq \
+  -in proofs/timestamps/<forecast-id>.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
+openssl ts -verify \
+  -data proofs/targets/<forecast-id>.json \
+  -in proofs/timestamps/<forecast-id>.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
+openssl ts -reply -in proofs/timestamps/<forecast-id>.tsr -text
+```
+
+The `-queryfile` check binds the response to the saved request and nonce. The
+`-data` check independently binds its message imprint to the exact target bytes.
+Both must succeed.
+
+Only after verification succeeds, copy `genTime`, policy OID, and serial number
+from the decoded response into the timestamp object. Add `ca_bundle_path`, set
+its state to `verified`, set integrity to `verified`, and record `verified_at`.
+
+```yaml
+integrity:
+  status: verified
+  target:
+    scope: forecast-envelope/v1
+    canonicalization: RFC8785
+    artifact_path: proofs/targets/<forecast-id>.json
+    digest:
+      algorithm: sha-256
+      value: <64-lowercase-hex-characters>
+  timestamps:
+    - type: rfc3161
+      request_path: proofs/timestamps/<forecast-id>.tsq
+      response_path: proofs/timestamps/<forecast-id>.tsr
+      tsa_url: https://tsa.example.com/
+      hash_algorithm: sha256
+      state: verified
+      gen_time: "2026-08-25T10:02:00Z"
+      policy_oid: 1.2.3.4.1
+      serial_number: "0123456789abcdef"
+      ca_bundle_path: proofs/timestamps/tsa-ca.pem
+  verified_at: "2026-08-25T10:03:00Z"
+```
+
+For redundancy, repeat steps 4 and 6 with other TSAs and append one timestamp
+object per service. Each TSA requires its own independently retained request,
+response, URL, and applicable CA bundle.
+
+### 7. Commit and publish the complete evidence set
+
+Stage the ledger, exact target, timestamp artifacts, and CA bundle together:
+
+```bash
+git add ledger.yaml proofs/targets/<forecast-id>.json proofs/timestamps/
 git commit -m "Record forecast <forecast-id>"
 git push
 ```
 
-The Git commit keeps the three files together in repository history. The
-OpenTimestamps receipt, not the Git commit time, supplies the independent time
-bound.
-
-### 7. Upgrade the timestamp
-
-After Bitcoin confirmation:
-
-```bash
-ots upgrade proofs/targets/<forecast-id>.json.ots
-ots verify proofs/targets/<forecast-id>.json.ots
-```
-
-Record the confirmed block height and the conservative `anchored_before` upper
-time bound reported by the verifier. Set the receipt state to `confirmed` and
-the integrity status to `verified`, then validate and commit the metadata update.
+The Git commit keeps the files together in repository history. The signed RFC
+3161 response, not the Git commit time, supplies the independent time claim.
 Do not edit the original forecast statement or target.
 
 ## Sealed forecast: recording workflow
@@ -214,12 +272,12 @@ Follow public-workflow steps 2 through 7 without modification:
 ```text
 validate
     -> build target
-    -> stamp target
+    -> create RFC 3161 request and obtain TSA response
     -> record pending integrity
     -> validate
-    -> commit ledger + target + receipt
+    -> verify the TSA response
+    -> commit ledger + target + timestamp artifacts + CA bundle
     -> push
-    -> upgrade and verify timestamp
 ```
 
 Timestamp the complete sealed envelope, not the ciphertext alone.
@@ -269,7 +327,7 @@ does not require a new timestamp.
 ### 4. Commit the reveal
 
 Commit and push the revealed ledger. The old sealed commit, target, and timestamp
-receipt remain the evidence that the hidden content existed before the reveal
+response remain the evidence that the hidden content existed before the reveal
 and, when applicable, before the outcome.
 
 ## Independent verifier workflow
@@ -279,7 +337,8 @@ branch view.
 
 ### 1. Select the containing commit
 
-Identify the first commit containing the forecast record, target, and receipt:
+Identify the first commit containing the forecast record, target, timestamp
+artifacts, and CA bundle:
 
 ```bash
 git log --follow -- ledger.yaml
@@ -295,8 +354,8 @@ python tools/validate.py ledger.yaml
 ```
 
 This checks JSON Schema, chronology, IDs, probability constraints, local target
-digests, and revealed sealed bundles. It does not parse the cryptographic content
-of `.ots` files.
+digests, and revealed sealed bundles. It does not parse or cryptographically
+verify binary `.tsr` files.
 
 ### 3. Rebuild and compare the target
 
@@ -311,12 +370,22 @@ digest mismatch invalidates the content-binding claim.
 ### 4. Verify the external timestamp
 
 ```bash
-ots verify proofs/targets/<forecast-id>.json.ots
+openssl ts -verify \
+  -queryfile proofs/timestamps/<forecast-id>.tsq \
+  -in proofs/timestamps/<forecast-id>.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
+openssl ts -verify \
+  -data proofs/targets/<forecast-id>.json \
+  -in proofs/timestamps/<forecast-id>.tsr \
+  -CAfile proofs/timestamps/tsa-ca.pem
 ```
 
-The proof must validate against the exact committed target. For a resolved
-forecast, the confirmed `anchored_before` time must precede
-`resolution.outcome_known_at`; otherwise it does not rule out hindsight.
+The response must validate against the exact committed request, exact target,
+and trusted TSA chain. Inspect it with
+`openssl ts -reply -in <response>.tsr -text` and compare
+its message imprint, `genTime`, policy OID, and serial number with the ledger.
+For a resolved forecast, at least one verified `genTime` must precede
+`resolution.outcome_known_at`; otherwise the evidence does not rule out hindsight.
 
 ### 5. Verify a reveal, when present
 
@@ -342,9 +411,9 @@ separate verification step.
 | --- | --- |
 | Ledger validation fails | The record is invalid |
 | Rebuilt target differs | Forecast content binding is invalid |
-| OTS receipt is pending | Historical existence is not yet independently confirmed |
-| OTS receipt fails | Historical existence claim is invalid |
-| Timestamp is not earlier than the known outcome | The receipt does not exclude hindsight |
+| RFC 3161 response is pending | Historical existence is not yet independently confirmed |
+| RFC 3161 signature, request, or trust-chain check fails | Historical existence claim is invalid |
+| Timestamp is not earlier than the known outcome | The response does not exclude hindsight |
 | Reveal decryption or hash check fails | The reveal is invalid |
 | Public mirror differs from decrypted content | The reveal is invalid |
 | Resolution sources do not support the criteria | The recorded outcome is unverified |
@@ -355,4 +424,5 @@ separately.
 
 ## External reference
 
-- [OpenTimestamps client](https://github.com/opentimestamps/opentimestamps-client)
+- [RFC 3161: Internet X.509 Public Key Infrastructure Time-Stamp Protocol](https://www.rfc-editor.org/rfc/rfc3161)
+- [OpenSSL `ts` command](https://docs.openssl.org/master/man1/openssl-ts/)
