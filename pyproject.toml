@@ -1,6 +1,6 @@
 [project]
 name = "forecast-ledger-schema"
-version = "1.0.0"
+version = "1.1.0"
 description = "Schema, validator, and cryptographic reference for verifiable quantitative forecast ledgers"
 readme = "README.md"
 requires-python = ">=3.11"

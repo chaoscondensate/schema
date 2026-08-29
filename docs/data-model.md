@@ -23,12 +23,15 @@ never mixes independent track records.
 
 | Field | Purpose |
 | --- | --- |
-| `schema_version` | Exact contract version. v1 requires `1.0.0`. |
+| `schema_version` | Exact contract version. This release requires `1.1.0`. |
 | `ledger_id` | Stable identifier for this track record. |
 | `forecaster` | One individual or team identity. |
 | `publication` | Optional Git repository and ledger location. |
 | `platforms` | Reusable platform/account registry. |
 | `questions` | Questions, forecast updates, and eventual resolutions. |
+
+`questions` may be an empty array. This is the normal initial state of a ledger
+created before any questions have been added.
 
 ## Forecaster identity
 
@@ -46,6 +49,10 @@ resolution time, and a self-reported status:
 - `resolved`
 - `annulled`
 - `disputed`
+
+`forecasts` may be an empty array. A question without forecasts is a valid
+backlog or handoff state: it can be assigned to another forecaster or retained
+for later analysis without inventing a placeholder forecast.
 
 Resolved, annulled, and disputed questions carry a matching `resolution`
 object. The Git history makes status changes auditable. A `resolved` record

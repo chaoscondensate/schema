@@ -23,15 +23,15 @@ When the documented workflow is followed, a verifier can establish:
 
 ## Current contract
 
-- Forecast Ledger: `1.0.0`
+- Forecast Ledger: `1.1.0`
 - JSON Schema dialect: Draft 2020-12
 - Canonicalization: RFC 8785 JCS, restricted to I-JSON values without floats
 - Sealed forecasts: `forecast-seal/v1`
 - Timestamp target: `forecast-envelope/v1`
 - Permanent schema ID:
-  `https://raw.githubusercontent.com/chaoscondensate/schema/v1.0.0/schema/forecast-ledger.schema.json`
+  `https://raw.githubusercontent.com/chaoscondensate/schema/v1.1.0/schema/forecast-ledger.schema.json`
 
-The schema ID points to the immutable `v1.0.0` Git tag in this repository. Never
+The schema ID points to the immutable `v1.1.0` Git tag in this repository. Never
 move a release tag or change a released schema in place.
 
 ## Quick start
@@ -67,8 +67,8 @@ python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.jso
 ## Minimal structure
 
 ```yaml
-$schema: https://raw.githubusercontent.com/chaoscondensate/schema/v1.0.0/schema/forecast-ledger.schema.json
-schema_version: 1.0.0
+$schema: https://raw.githubusercontent.com/chaoscondensate/schema/v1.1.0/schema/forecast-ledger.schema.json
+schema_version: 1.1.0
 ledger_id: example-forecaster
 created_at: "2026-08-25T10:00:00+01:00"
 default_timezone: Europe/London
@@ -79,29 +79,15 @@ forecaster:
   name: Example Forecaster
 
 platforms: {}
-questions:
-  - id: q-example
-    title: Will the example event occur by 2026-12-31?
-    type: binary
-    status: open
-    resolution_criteria: Resolve YES if the event is publicly confirmed before 2027-01-01T00:00:00Z.
-    created_at: "2026-08-25T10:00:00+01:00"
-    forecast_window:
-      closes_at: "2026-12-01T00:00:00Z"
-    expected_resolution_at: "2027-01-01T00:00:00Z"
-    forecasts:
-      - id: f-example-001
-        forecasted_at: "2026-08-25T10:05:00+01:00"
-        recorded_at: "2026-08-25T10:06:00+01:00"
-        visibility: public
-        value:
-          kind: binary
-          probability_bp: 6500
-        integrity:
-          status: unanchored
+questions: []
 ```
 
-See the complete [JSON example](examples/valid/individual-ledger.json) and
+Questions may also exist before a forecast is available. Keep the required
+question metadata and use `forecasts: []`; no placeholder probability is needed.
+
+See the [empty ledger](examples/valid/empty-ledger.json),
+[question backlog](examples/valid/question-without-forecasts.yaml), complete
+[JSON example](examples/valid/individual-ledger.json), and complete
 [YAML example](examples/valid/team-ledger.yaml).
 
 ## Data model
@@ -183,9 +169,10 @@ tools/forecast_crypto.py   Seal, reveal, and canonicalization reference
 
 ## Publishing and versioning
 
-The first public release is tagged `v1.0.0` and published as an immutable GitHub
-release. Release assets include the schema, examples, documentation, and a
-checksum manifest. The schema `$id` resolves directly to the tagged source file.
+The current release is tagged `v1.1.0`; `v1.0.0` remains available as the first
+immutable release. Release assets include the schema, examples, documentation,
+and a checksum manifest. The schema `$id` resolves directly to the tagged source
+file.
 
 Each released schema requires its exact `schema_version`. A breaking contract
 change receives a new major version and a new permanent URL. Released files are
