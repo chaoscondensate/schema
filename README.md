@@ -194,17 +194,16 @@ tools/forecast_crypto.py   Seal, reveal, and canonicalization reference
 
 ## Publishing and versioning
 
-The current release is tagged `v1.2.0`. Version `1.1.0` is superseded and should
-not be used. Older tags remain immutable archive records. Release assets include
-the schema, examples, documentation, and a checksum manifest. The schema `$id`
-resolves directly to the tagged source file.
+The current and only supported release is tagged `v1.2.0`. Release assets
+include the schema, examples, documentation, and a checksum manifest. The
+schema `$id` resolves directly to the tagged source file.
 
 Each released schema requires its exact `schema_version`. This pre-adoption
-release intentionally makes a breaking change in a minor version because no
-clients depend on `1.1.0`. Once the contract has adopters, breaking changes
-receive a new major version and permanent URL. Released files are never
-overwritten; Git provides development history, while release tags define
-immutable public contracts.
+phase permits breaking changes in a minor version because no clients depend on
+the contract yet. Once the contract has adopters, breaking changes receive a new
+major version and permanent URL. Released files are never overwritten; Git
+provides development history, while release tags define immutable public
+contracts.
 
 ## License and contributions
 
