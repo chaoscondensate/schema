@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v1.2.0/schema/forecast-ledger.schema.json",
+  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v1.3.0/schema/forecast-ledger.schema.json",
   "title": "Forecast Ledger",
   "description": "A portable, machine-verifiable ledger for quantitative forecasts made by one individual or team forecasting identity.",
   "type": "object",
@@ -21,7 +21,7 @@
       "description": "A tooling pointer to this JSON Schema."
     },
     "schema_version": {
-      "const": "1.2.0",
+      "const": "1.3.0",
       "description": "The exact Forecast Ledger contract version used by this document."
     },
     "ledger_id": {
@@ -307,13 +307,10 @@
     },
     "forecastWindow": {
       "type": "object",
-      "required": ["closes_at"],
+      "required": ["opens_at"],
       "additionalProperties": false,
       "properties": {
         "opens_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "closes_at": {
           "$ref": "#/$defs/timestamp"
         }
       }
@@ -990,7 +987,6 @@
         "status",
         "resolution_criteria",
         "created_at",
-        "forecast_window",
         "expected_resolution_at",
         "forecasts"
       ],

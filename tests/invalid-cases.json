@@ -84,21 +84,33 @@
     "expect_contains": "duplicate id"
   },
   {
-    "name": "forecast-outside-window",
+    "name": "forecast-before-opening",
     "base": "examples/valid/individual-ledger.json",
     "operations": [
       {
         "op": "replace",
         "path": "/questions/0/forecasts/0/forecasted_at",
-        "value": "2026-09-11T10:00:00+01:00"
+        "value": "2026-07-31T10:00:00+01:00"
       },
       {
         "op": "replace",
         "path": "/questions/0/forecasts/0/recorded_at",
-        "value": "2026-09-11T10:01:00+01:00"
+        "value": "2026-07-31T10:01:00+01:00"
       }
     ],
-    "expect_contains": "must fall inside the question forecast window"
+    "expect_contains": "must not precede forecast_window.opens_at or question.created_at"
+  },
+  {
+    "name": "closes-at-is-not-supported",
+    "base": "examples/valid/team-ledger.yaml",
+    "operations": [
+      {
+        "op": "add",
+        "path": "/questions/0/forecast_window/closes_at",
+        "value": "2026-08-31T23:59:59+01:00"
+      }
+    ],
+    "expect_contains": "$.questions[0].forecast_window"
   },
   {
     "name": "tampered-revealed-value",

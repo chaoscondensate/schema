@@ -191,7 +191,7 @@ requires at least one verified RFC 3161 `gen_time` to predate a known outcome.
 It validates the declared metadata and chronology but does not parse or verify
 the binary `.tsr`; independent verification must run the command above.
 
-RFC 3161 is the only timestamp protocol supported by `1.2.0`. Multiple timestamp
+RFC 3161 is the only timestamp protocol supported by `1.3.0`. Multiple timestamp
 objects may retain independent responses from multiple TSAs.
 
 Keep target artifacts and timestamp evidence permanently and replicate them

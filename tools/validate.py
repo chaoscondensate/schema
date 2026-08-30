@@ -173,16 +173,8 @@ def check_semantics(
 
     for question_index, question in enumerate(ledger["questions"]):
         qpath = f"$.questions[{question_index}]"
-        window = question["forecast_window"]
+        window = question.get("forecast_window", {})
         opens_at = parse_time(window.get("opens_at", question["created_at"]))
-        closes_at = parse_time(window["closes_at"])
-        if opens_at > closes_at:
-            problems.add(f"{qpath}.forecast_window", "opens_at must not exceed closes_at")
-        if parse_time(question["expected_resolution_at"]) < closes_at:
-            problems.add(
-                f"{qpath}.expected_resolution_at",
-                "must not be earlier than forecast_window.closes_at",
-            )
 
         for ref_index, ref in enumerate(question.get("platform_refs", [])):
             if ref["platform"] not in platform_ids:
@@ -206,10 +198,10 @@ def check_semantics(
             recorded_at = parse_time(forecast["recorded_at"])
             if forecasted_at > recorded_at:
                 problems.add(f"{fpath}.recorded_at", "must not precede forecasted_at")
-            if not opens_at <= forecasted_at <= closes_at:
+            if forecasted_at < opens_at:
                 problems.add(
                     f"{fpath}.forecasted_at",
-                    "must fall inside the question forecast window",
+                    "must not precede forecast_window.opens_at or question.created_at",
                 )
             if previous_recorded_at and recorded_at < previous_recorded_at:
                 problems.add(fpath, "forecasts must be ordered by recorded_at")

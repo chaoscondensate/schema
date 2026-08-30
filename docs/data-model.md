@@ -23,7 +23,7 @@ never mixes independent track records.
 
 | Field | Purpose |
 | --- | --- |
-| `schema_version` | Exact contract version. This release requires `1.2.0`. |
+| `schema_version` | Exact contract version. This release requires `1.3.0`. |
 | `ledger_id` | Stable identifier for this track record. |
 | `forecaster` | One individual or team identity. |
 | `publication` | Optional Git repository and ledger location. |
@@ -40,8 +40,8 @@ members, but the team remains one scoring identity.
 
 ## Questions and lifecycle
 
-Every question has precise resolution criteria, a forecast window, an expected
-resolution time, and a self-reported status:
+Every question has precise resolution criteria, an expected resolution time,
+and a self-reported status:
 
 - `open`
 - `closed`
@@ -53,6 +53,12 @@ resolution time, and a self-reported status:
 `forecasts` may be an empty array. A question without forecasts is a valid
 backlog or handoff state: it can be assigned to another forecaster or retained
 for later analysis without inventing a placeholder forecast.
+
+`forecast_window` is optional. When present, it contains only `opens_at` and
+prevents forecasts from claiming a time before forecasting was allowed. The
+ledger deliberately does not duplicate a platform's closing time: lifecycle
+status and the platform record carry that information, while private questions
+retain the required `expected_resolution_at`.
 
 Resolved, annulled, and disputed questions carry a matching `resolution`
 object. The Git history makes status changes auditable. A `resolved` record
