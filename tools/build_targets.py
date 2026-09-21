@@ -27,11 +27,13 @@ def main() -> int:
     report = []
 
     for question in ledger["questions"]:
+        revisions = {revision["id"]: revision for revision in question["revisions"]}
         for forecast in question["forecasts"]:
+            revision = revisions[forecast["question_revision_id"]]
             if forecast["visibility"] == "public":
-                envelope = public_forecast_envelope(question["id"], forecast)
+                envelope = public_forecast_envelope(question["id"], forecast, revision)
             else:
-                envelope = sealed_forecast_envelope(question["id"], forecast)
+                envelope = sealed_forecast_envelope(question["id"], forecast, revision)
             data = canonicalize(envelope)
             path = args.output / f"{forecast['id']}.json"
             path.write_bytes(data)

@@ -1,208 +1,303 @@
 # Cryptographic verification
 
-This document is normative for `forecast-envelope/v1` and
-`forecast-seal/v1`. The reference implementation is
-[`tools/forecast_crypto.py`](../tools/forecast_crypto.py).
+This document is normative for `forecast-envelope/v2` and `forecast-seal/v2`.
+The executable reference is
+[`tools/forecast_crypto.py`](../tools/forecast_crypto.py). The same module keeps
+the frozen v1 algorithm solely to verify historical `forecast-seal/v1` vectors.
 
-For the end-to-end invocation order and independent verifier checklist, see
-[`forecast-verification-workflows.md`](forecast-verification-workflows.md).
+## Security claims and non-claims
 
-## Security goals
+The protocol can establish:
 
-The protocol provides:
+- content binding: the timestamp covers one exact forecast and question revision;
+- hiding: sealed representations and reasoning remain confidential until reveal;
+- reveal binding: a valid key opens the commitment to one canonical plaintext;
+- existence timing: a trusted TSA signed the exact envelope digest at RFC 3161 `genTime`;
+- portable verification from retained target, request, response, and trust chain.
 
-- content binding: a recorded forecast cannot be opened as another forecast;
-- hiding: a sealed forecast and its reasoning remain confidential until reveal;
-- existence timing: a trusted TSA signs the digest of a precise envelope and
-  records its RFC 3161 `genTime`;
-- portable verification: the Git host is not required once artifacts, RFC 3161
-  responses, requests, and trust anchors are downloaded.
-
-It does not prove authorship by itself, guarantee that the ledger is complete,
-or prove that a self-reported `forecasted_at` is exact. Forecast Ledger v1 does
-not define a cryptographic authorship protocol. A timestamp, commitment hash, or
-valid decryption is not a signature.
+It does not prove authorship, ledger completeness, outcome truth, or that a
+self-reported `forecasted_at` is exact. Forecast Ledger defines no Git-signature
+or per-forecast signature requirement. A commitment, Git commit hash, hosting
+account, and RFC 3161 token are not author signatures.
 
 ## Canonicalization
 
-Timestamp targets and seal plaintext use RFC 8785 JSON Canonicalization Scheme
-(JCS). Forecast Ledger further restricts canonicalized values:
+All envelope and seal objects are serialized with RFC 8785 JSON Canonicalization
+Scheme. Forecast Ledger restricts canonicalized data to:
 
+- strings, booleans, null, arrays, and objects;
+- integers within the I-JSON safe range;
 - no floating-point JSON numbers;
-- integers must be within the I-JSON safe range;
-- decimals are strings;
-- duplicate object keys and lone Unicode surrogates are invalid.
+- no duplicate keys or lone Unicode surrogates.
 
-This keeps implementations simple without defining a private serialization
-format. `tools/forecast_crypto.py` implements the exact supported subset,
-including UTF-16 property ordering required by RFC 8785.
+Probabilities and numeric values are strings. The reference implementation uses
+UTF-16 property ordering as required by RFC 8785 and outputs UTF-8 without a
+trailing newline.
 
-## Public forecast envelope
+## `forecast-envelope/v2`
 
-For a public forecast, canonicalize this object:
+The envelope is the exact object sent to RFC 8785 canonicalization and then
+SHA-256. It includes the full bound revision, not only its ID.
+
+### Public envelope
 
 ```json
 {
-  "schema": "forecast-envelope/v1",
-  "question_id": "q-example",
+  "schema": "forecast-envelope/v2",
+  "question": {
+    "id": "q-example",
+    "revision": {
+      "id": "qr-example-1",
+      "effective_at": "2026-09-21T10:00:00Z",
+      "recorded_at": "2026-09-21T10:00:00Z",
+      "title": "Will the event occur?",
+      "resolution_criteria": "Resolve YES if ...",
+      "expected_resolution_at": "2027-01-01T00:00:00Z",
+      "outcome_space": {"kind": "binary"},
+      "domain": {"kind": "binary"}
+    }
+  },
   "forecast": {
-    "id": "f-example-001",
-    "forecasted_at": "2026-08-25T10:00:00+01:00",
-    "recorded_at": "2026-08-25T10:01:00+01:00",
+    "id": "f-example-1",
+    "question_revision_id": "qr-example-1",
+    "forecasted_at": "2026-09-21T10:05:00Z",
+    "recorded_at": "2026-09-21T10:05:10Z",
     "visibility": "public",
-    "value": { "kind": "binary", "probability_bp": 6500 },
-    "rationale": "...",
-    "key_factors": ["..."]
+    "representations": [
+      {"kind": "probability", "outcome": true, "probability": "0.62"}
+    ]
   }
 }
 ```
 
-Include every present immutable forecast statement field listed by
-`public_forecast_envelope()`. Exclude `integrity`; adding timestamp metadata after
-timestamping must not make the target recursive.
+The builder includes every present forecast statement field supported by
+`public_forecast_envelope()`, including reasoning, supersession, provenance,
+and lifecycle events. It excludes `integrity`; otherwise adding the timestamp
+metadata would recursively change the timestamp target.
 
-## Sealed forecast protocol
+Binding the complete revision prevents a valid timestamp from being reinterpreted
+under later wording, options, bounds, units, bins, or resolution criteria.
 
-### Inputs
+### Sealed envelope
 
-- 32 random bytes `salt` from a CSPRNG;
-- 32 random bytes `key` from a CSPRNG;
-- 12 unique random bytes `nonce`;
-- bundle fields: `forecasted_at`, `recorded_at`, `value`, `rationale`,
-  `key_factors`, and `comment`.
-
-Never reuse a `(key, nonce)` pair. A fresh key per forecast is recommended.
-
-### Plaintext and commitment
-
-Construct and JCS-canonicalize:
+The sealed envelope has the same `schema` and full `question`. Its forecast
+contains the visible IDs and times plus:
 
 ```json
 {
-  "schema": "forecast-seal/v1",
+  "visibility": "sealed",
+  "commitment": {
+    "scheme": "forecast-seal/v2",
+    "commitment_hash": {"algorithm": "sha-256", "value": "..."},
+    "encryption": {
+      "algorithm": "chacha20-poly1305",
+      "nonce": "...",
+      "ciphertext": "..."
+    }
+  }
+}
+```
+
+`key_hint` is excluded because it is an operational pointer that may rotate
+without changing the sealed claim. `revealed_at` and `revealed_key` are excluded
+so rebuilding a revealed forecast produces the original sealed target.
+
+## `forecast-seal/v2`
+
+### Inputs
+
+Generate independently for every forecast:
+
+- 32 random salt bytes from a CSPRNG;
+- 32 random ChaCha20-Poly1305 key bytes from a CSPRNG;
+- 12 nonce bytes, unique for that key;
+- a non-secret `key_hint`.
+
+Never reuse a `(key, nonce)` pair. A fresh key per forecast is recommended.
+
+The private bundle contains exactly the forecast data later mirrored at reveal:
+
+```json
+{
+  "question_revision_id": "qr-example-1",
+  "forecasted_at": "2026-09-21T10:05:00Z",
+  "recorded_at": "2026-09-21T10:05:10Z",
+  "representations": ["..."],
+  "rationale": "...",
+  "key_factors": ["..."],
+  "comment": "..."
+}
+```
+
+### Step 1: canonical plaintext
+
+Construct this object and canonicalize it:
+
+```json
+{
+  "schema": "forecast-seal/v2",
   "question_id": "q-example",
-  "forecast_id": "f-example-001",
-  "bundle": { "...": "..." },
+  "question_revision_id": "qr-example-1",
+  "forecast_id": "f-example-1",
+  "bundle": {"...": "..."},
   "salt": "64 lowercase hexadecimal characters"
 }
 ```
 
-Then calculate:
+The salt is inside canonical JSON, so there is no delimiter ambiguity.
+
+### Step 2: commitment
 
 ```text
-C = SHA-256(canonical_plaintext)
+commitment_hash = SHA-256(canonical_plaintext)
 ```
 
-The salt is a fixed-length hex field inside canonical JSON. No delimiter is
-used, so every possible 32-byte salt is decoded unambiguously.
+### Step 3: associated data
 
-### Encryption
-
-Associated data is JCS-canonical JSON:
+Construct and canonicalize:
 
 ```json
 {
-  "scheme": "forecast-seal/v1",
+  "scheme": "forecast-seal/v2",
   "question_id": "q-example",
-  "forecast_id": "f-example-001",
-  "commitment_sha256": "C"
+  "question_revision_id": "qr-example-1",
+  "forecast_id": "f-example-1",
+  "commitment_sha256": "64 lowercase hexadecimal characters"
 }
 ```
 
-Encrypt the canonical plaintext with ChaCha20-Poly1305. Publish `C`, algorithm,
-nonce, ciphertext, and a non-secret key-manager pointer. Keep key and salt
-secret; the salt is recoverable from the ciphertext.
+The question revision ID is repeated in the payload, bundle, and associated
+data. A mismatch is always an error.
 
-### Timestamp target
+### Step 4: encryption
 
-Do not timestamp ciphertext alone. The sealed `forecast-envelope/v1` contains
-the question ID, forecast ID, visible times, scheme, commitment hash, algorithm,
-nonce, and ciphertext. This binds every security-relevant input and avoids
-relying on properties that ordinary AEAD does not promise.
+Encrypt the canonical plaintext using ChaCha20-Poly1305 with the 32-byte key,
+12-byte nonce, and canonical associated data. Publish the scheme, commitment,
+algorithm, standard base64 nonce/ciphertext, and `key_hint`. Keep the key and
+plaintext secret.
 
-`key_hint` is intentionally excluded: it is an operational pointer that may be
-rotated without changing the forecast.
+### Step 5: external timestamp
 
-### Reveal
+Create the full sealed `forecast-envelope/v2`, canonicalize it, compute its
+SHA-256 digest, and request RFC 3161 timestamps for those exact bytes. Do not
+timestamp ciphertext alone.
 
-Publish the 32-byte key as lowercase hex and set `visibility: revealed`.
-Retain the original commitment and ciphertext. A verifier:
+## Reveal verification order
 
-1. reconstructs associated data;
-2. decrypts and authenticates the ciphertext;
-3. verifies `SHA-256(plaintext) == C`;
-4. checks scheme, question ID, and forecast ID;
-5. checks that the public plaintext mirror equals the decrypted bundle;
-6. verifies the timestamp target and RFC 3161 response.
+When publishing a reveal, retain the original commitment, nonce, and ciphertext;
+add the key and exact plaintext mirror. A verifier performs these operations in
+order:
 
-## Timestamp workflow
+1. check key length and decode nonce/ciphertext;
+2. reconstruct associated data from ledger IDs and the commitment hash;
+3. authenticate and decrypt ChaCha20-Poly1305;
+4. compute SHA-256 over the decrypted bytes and compare it to the commitment;
+5. parse JSON and require `schema: forecast-seal/v2`;
+6. compare question, revision, and forecast IDs;
+7. recanonicalize and require byte-for-byte equality with decrypted bytes;
+8. compare every public mirror field with the decrypted bundle;
+9. rebuild the sealed envelope and compare it with the timestamped target;
+10. independently verify at least one RFC 3161 response.
 
-Generate exact target artifacts:
+Failure at any step invalidates the reveal or timing claim; do not continue and
+report a generic success.
+
+## RFC 3161 timestamp procedure
+
+Build targets:
 
 ```bash
 python tools/build_targets.py ledger.yaml --output proofs/targets
 ```
 
-For each report entry, copy the artifact path and digest into `integrity.target`.
-Create an RFC 3161 request over the exact target using SHA-256:
+Create a request over one target:
 
 ```bash
 mkdir -p proofs/timestamps
 openssl ts -query \
-  -data proofs/targets/f-example-001.json \
+  -data proofs/targets/f-example-1.json \
   -sha256 -cert \
-  -out proofs/timestamps/f-example-001.tsq
+  -out proofs/timestamps/f-example-1.tsa-a.tsq
 ```
 
-Send the binary request to a Time Stamping Authority and retain its binary
-response:
+Send the binary request and retain the binary response:
 
 ```bash
 curl --fail --silent --show-error \
   -H "Content-Type: application/timestamp-query" \
-  --data-binary @proofs/timestamps/f-example-001.tsq \
+  --data-binary @proofs/timestamps/f-example-1.tsa-a.tsq \
   "$TSA_URL" \
-  --output proofs/timestamps/f-example-001.tsr
+  --output proofs/timestamps/f-example-1.tsa-a.tsr
 ```
 
-Verify the response using the exact request and a retained CA bundle, then
-inspect the signed token metadata:
+Verify both bindings with a retained CA bundle:
 
 ```bash
 openssl ts -verify \
-  -queryfile proofs/timestamps/f-example-001.tsq \
-  -in proofs/timestamps/f-example-001.tsr \
-  -CAfile proofs/timestamps/tsa-ca.pem
+  -queryfile proofs/timestamps/f-example-1.tsa-a.tsq \
+  -in proofs/timestamps/f-example-1.tsa-a.tsr \
+  -CAfile proofs/timestamps/tsa-a-ca.pem
 openssl ts -verify \
-  -data proofs/targets/f-example-001.json \
-  -in proofs/timestamps/f-example-001.tsr \
-  -CAfile proofs/timestamps/tsa-ca.pem
-openssl ts -reply -in proofs/timestamps/f-example-001.tsr -text
+  -data proofs/targets/f-example-1.json \
+  -in proofs/timestamps/f-example-1.tsa-a.tsr \
+  -CAfile proofs/timestamps/tsa-a-ca.pem
+openssl ts -reply -in proofs/timestamps/f-example-1.tsa-a.tsr -text
 ```
 
-The first verification binds the response to the saved request and its nonce.
-The second binds the response message imprint to the exact target bytes. Both
-must succeed.
+The request check covers the saved nonce and requested imprint. The data check
+covers the exact envelope bytes. Record the TSA URL, request, response, CA
+bundle, `gen_time`, policy OID, and serial number only after verification.
 
-Record the request and response paths, TSA URL, CA bundle path, `gen_time`,
-policy OID, and serial number. Set the timestamp state and integrity status to
-`verified` only after the OpenSSL verification succeeds. The semantic validator
-requires at least one verified RFC 3161 `gen_time` to predate a known outcome.
-It validates the declared metadata and chronology but does not parse or verify
-the binary `.tsr`; independent verification must run the command above.
+### Redundant TSAs
 
-RFC 3161 is the only timestamp protocol supported by `1.3.0`. Multiple timestamp
-objects may retain independent responses from multiple TSAs.
+Append one `timestamps` item per TSA. Each item has its own request, response,
+URL, trust bundle, and signed metadata. The ledger remains verifiable when one
+service disappears if the verifier still has:
 
-Keep target artifacts and timestamp evidence permanently and replicate them
-outside the Git repository. Keep the `.tsq`, `.tsr`, and CA bundle with the exact
-target; none is sufficient alone for portable verification.
+- the exact target;
+- a valid response from another trusted TSA;
+- that response's matching request and retained trust chain.
 
-## Test vector
+No live TSA server is needed for verification. Replicate artifacts and trust
+bundles outside the repository because service availability and certificate
+distribution can change.
 
-`tests/vectors/forecast-seal-v1.json` is deterministic and includes a salt that
-contains byte `0x1f`. It guards against delimiter-based parsing regressions.
+### Chronology rule
+
+For a resolved question, at least one verified RFC 3161 `gen_time` must be
+strictly earlier than `resolution.outcome_known_at`. A later token may still
+prove integrity from that later time, but it does not exclude hindsight.
+
+The semantic validator checks declared digests and chronology. It does not parse
+or cryptographically verify `.tsr` files; independent verification must run the
+OpenSSL checks above.
+
+## Protocol exclusions
+
+- OpenTimestamps is not accepted by the v2 schema.
+- TLS/HTTPS transport does not timestamp a forecast.
+- Git commit times are not trusted external timestamps.
+- Signed Git commits are not required and do not replace RFC 3161.
+- A platform's `source_created_at` or `source_updated_at` is provenance, not a
+  cryptographic time claim.
+
+## Test vectors and frozen v1 bytes
+
+Verify both vectors:
 
 ```bash
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
+python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+python tools/verify_legacy.py
 ```
+
+The v2 vector fixes every input, including salt, key, and nonce, for
+cross-language conformance. The v1 vector and v1.3.0 schema must remain
+byte-for-byte equal to the files at the `v1.3.0` tag. `verify_legacy.py` enforces
+their recorded SHA-256 digests.
+
+## External references
+
+- [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785)
+- [RFC 3161: Time-Stamp Protocol](https://www.rfc-editor.org/rfc/rfc3161)
+- [OpenSSL `ts`](https://docs.openssl.org/master/man1/openssl-ts/)

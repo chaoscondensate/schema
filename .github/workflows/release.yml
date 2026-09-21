@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Check out tagged source
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -24,10 +26,15 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
 
       - name: Verify release candidate
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          test "v$(python -c 'import json; print(json.load(open("schema/forecast-ledger.schema.json"))["properties"]["schema_version"]["const"])')" = "${RELEASE_TAG}"
           check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
           python tools/run_fixture_tests.py
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
+          python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+          python tools/verify_legacy.py
           ruff check tools
 
       - name: Build release archive and checksums
@@ -36,18 +43,30 @@ jobs:
         run: |
           mkdir -p dist
           tar -czf "dist/forecast-ledger-schema-${RELEASE_TAG}.tar.gz" \
-            schema examples docs tests tools README.md LICENSE CONTRIBUTING.md SECURITY.md
+            schema examples docs research tests tools .github \
+            README.md LICENSE CONTRIBUTING.md SECURITY.md pyproject.toml requirements-dev.txt
+          cp schema/forecast-ledger.schema.json \
+            "dist/forecast-ledger-${RELEASE_TAG}.schema.json"
+          cp examples/valid/individual-ledger.json \
+            "dist/forecast-ledger-${RELEASE_TAG}.example.json"
+          cp examples/valid/team-ledger.yaml \
+            "dist/forecast-ledger-${RELEASE_TAG}.example.yaml"
           cd dist
-          sha256sum "forecast-ledger-schema-${RELEASE_TAG}.tar.gz" > SHA256SUMS
+          sha256sum forecast-ledger-* > SHA256SUMS
 
       - name: Publish immutable GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          NOTES_FILE="docs/releases/${RELEASE_TAG#v}.md"
+          if [[ -f "${NOTES_FILE}" ]]; then
+            NOTES_ARGS=(--notes-file "${NOTES_FILE}")
+          else
+            NOTES_ARGS=(--generate-notes)
+          fi
           gh release create "${RELEASE_TAG}" \
             --verify-tag \
-            --generate-notes \
+            "${NOTES_ARGS[@]}" \
             --title "Forecast Ledger ${RELEASE_TAG}" \
-            dist/forecast-ledger-schema-"${RELEASE_TAG}".tar.gz \
-            dist/SHA256SUMS
+            dist/*

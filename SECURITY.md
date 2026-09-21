@@ -2,9 +2,10 @@
 
 ## Supported version
 
-Only the latest released major version receives security fixes. A cryptographic
-protocol defect may require a new protocol identifier even when the surrounding
-ledger schema remains compatible.
+Only the latest released major version receives security fixes. Historical
+v1.3.0 artifacts remain verifiable but do not receive new features. A
+cryptographic protocol defect may require a new protocol identifier even when
+the surrounding ledger schema remains compatible.
 
 ## Reporting a vulnerability
 

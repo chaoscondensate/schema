@@ -55,6 +55,7 @@ def main() -> int:
     failed = False
 
     valid_paths = sorted((ROOT / "examples/valid").glob("*.*"))
+    valid_paths += sorted((ROOT / "tests/conformance/valid").glob("*.*"))
     for path in valid_paths:
         errors = problems_for(load_document(path), schema)
         if errors:

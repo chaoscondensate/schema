@@ -1,73 +1,46 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v1.3.0/schema/forecast-ledger.schema.json",
+  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.0.0/schema/forecast-ledger.schema.json",
   "title": "Forecast Ledger",
   "description": "A portable, machine-verifiable ledger for quantitative forecasts made by one individual or team forecasting identity.",
   "type": "object",
-  "required": [
-    "schema_version",
-    "ledger_id",
-    "created_at",
-    "default_timezone",
-    "forecaster",
-    "platforms",
-    "questions"
-  ],
+  "required": ["schema_version", "ledger_id", "created_at", "default_timezone", "forecaster", "platforms", "questions"],
   "additionalProperties": false,
   "properties": {
-    "$schema": {
-      "type": "string",
-      "format": "uri-reference",
-      "description": "A tooling pointer to this JSON Schema."
-    },
-    "schema_version": {
-      "const": "1.3.0",
-      "description": "The exact Forecast Ledger contract version used by this document."
-    },
-    "ledger_id": {
-      "$ref": "#/$defs/slug"
-    },
-    "title": {
-      "type": "string",
-      "minLength": 1
-    },
-    "description": {
-      "type": "string",
-      "minLength": 1
-    },
-    "created_at": {
-      "$ref": "#/$defs/timestamp"
-    },
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "schema_version": { "const": "2.0.0" },
+    "ledger_id": { "$ref": "#/$defs/slug" },
+    "title": { "$ref": "#/$defs/nonEmptyString" },
+    "description": { "$ref": "#/$defs/nonEmptyString" },
+    "created_at": { "$ref": "#/$defs/timestamp" },
     "default_timezone": {
       "type": "string",
       "minLength": 1,
-      "description": "An IANA time-zone name used by authoring tools. Every stored timestamp still carries an explicit UTC offset."
+      "description": "An IANA time-zone name used by authoring tools. Stored timestamps still carry an explicit UTC offset or Z."
     },
-    "forecaster": {
-      "$ref": "#/$defs/forecaster"
-    },
-    "publication": {
-      "$ref": "#/$defs/publication",
-      "description": "Optional Git publication metadata for locating the ledger repository and path."
-    },
+    "forecaster": { "$ref": "#/$defs/forecaster" },
+    "publication": { "$ref": "#/$defs/publication" },
     "platforms": {
       "type": "object",
-      "propertyNames": {
-        "$ref": "#/$defs/slug"
-      },
-      "additionalProperties": {
-        "$ref": "#/$defs/platform"
-      }
+      "propertyNames": { "$ref": "#/$defs/slug" },
+      "additionalProperties": { "$ref": "#/$defs/platform" }
+    },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relationship" }
     },
     "questions": {
       "type": "array",
-      "description": "Questions in this ledger. An empty array is a valid newly created ledger.",
-      "items": {
-        "$ref": "#/$defs/question"
-      }
+      "description": "Questions in the ledger. An empty array is a valid newly created ledger.",
+      "items": { "$ref": "#/$defs/question" }
     }
   },
   "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
     "slug": {
       "type": "string",
       "minLength": 1,
@@ -77,43 +50,45 @@
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
-      "description": "An RFC 3339 timestamp with seconds and an explicit UTC offset or Z."
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
     },
     "date": {
       "type": "string",
       "format": "date",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
     },
+    "canonicalDecimal": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^(?:0|-?[1-9][0-9]*|-?(?:0|[1-9][0-9]*)\\.[0-9]*[1-9])$",
+      "description": "A canonical finite decimal: no exponent, leading plus, redundant leading/trailing zeros, or negative zero."
+    },
+    "probability": {
+      "type": "string",
+      "pattern": "^(?:0|1|0\\.[0-9]{0,17}[1-9])$",
+      "description": "An exact canonical decimal probability in [0,1], with at most 18 fractional digits."
+    },
+    "openProbability": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]{0,17}[1-9]$",
+      "description": "An exact canonical decimal probability strictly between 0 and 1."
+    },
     "relativePath": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9._/-]*$",
-      "description": "A repository-relative path without parent traversal."
+      "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9._/-]*$"
     },
     "sha256": {
       "type": "object",
       "required": ["algorithm", "value"],
       "additionalProperties": false,
       "properties": {
-        "algorithm": {
-          "const": "sha-256"
-        },
-        "value": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        }
+        "algorithm": { "const": "sha-256" },
+        "value": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
-    "hex32": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "base64Nonce12": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9+/]{16}$",
-      "description": "Standard unpadded base64 encoding of exactly 12 bytes."
-    },
+    "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "base64Nonce12": { "type": "string", "pattern": "^[A-Za-z0-9+/]{16}$" },
     "base64Ciphertext": {
       "type": "string",
       "minLength": 24,
@@ -123,33 +98,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "email": {
-          "type": "string",
-          "format": "email"
-        },
-        "website": {
-          "type": "string",
-          "format": "uri"
-        }
-      }
+        "email": { "type": "string", "format": "email" },
+        "website": { "type": "string", "format": "uri" }
+      },
+      "minProperties": 1
     },
     "profile": {
       "type": "object",
       "required": ["service", "url"],
       "additionalProperties": false,
       "properties": {
-        "service": {
-          "type": "string",
-          "minLength": 1
-        },
-        "username": {
-          "type": "string",
-          "minLength": 1
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        }
+        "service": { "$ref": "#/$defs/nonEmptyString" },
+        "username": { "$ref": "#/$defs/nonEmptyString" },
+        "url": { "type": "string", "format": "uri" }
       }
     },
     "member": {
@@ -157,23 +118,10 @@
       "required": ["id", "name"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "role": {
-          "type": "string",
-          "minLength": 1
-        },
-        "profiles": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/profile"
-          }
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "profiles": { "type": "array", "items": { "$ref": "#/$defs/profile" } }
       }
     },
     "forecaster": {
@@ -181,52 +129,16 @@
       "required": ["id", "kind", "name"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "kind": {
-          "enum": ["individual", "team"]
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contact": {
-          "$ref": "#/$defs/contact"
-        },
-        "profiles": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/profile"
-          }
-        },
-        "members": {
-          "type": "array",
-          "minItems": 2,
-          "items": {
-            "$ref": "#/$defs/member"
-          }
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "kind": { "enum": ["individual", "team"] },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "contact": { "$ref": "#/$defs/contact" },
+        "profiles": { "type": "array", "items": { "$ref": "#/$defs/profile" } },
+        "members": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/member" } }
       },
       "oneOf": [
-        {
-          "properties": {
-            "kind": {
-              "const": "individual"
-            }
-          },
-          "not": {
-            "required": ["members"]
-          }
-        },
-        {
-          "properties": {
-            "kind": {
-              "const": "team"
-            }
-          },
-          "required": ["members"]
-        }
+        { "properties": { "kind": { "const": "individual" } }, "not": { "required": ["members"] } },
+        { "properties": { "kind": { "const": "team" } }, "required": ["members"] }
       ]
     },
     "publication": {
@@ -234,20 +146,10 @@
       "required": ["history", "repository_url", "default_branch", "ledger_path"],
       "additionalProperties": false,
       "properties": {
-        "history": {
-          "const": "git"
-        },
-        "repository_url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "default_branch": {
-          "type": "string",
-          "minLength": 1
-        },
-        "ledger_path": {
-          "$ref": "#/$defs/relativePath"
-        }
+        "history": { "const": "git" },
+        "repository_url": { "type": "string", "format": "uri" },
+        "default_branch": { "$ref": "#/$defs/nonEmptyString" },
+        "ledger_path": { "$ref": "#/$defs/relativePath" }
       }
     },
     "platform": {
@@ -255,78 +157,84 @@
       "required": ["name", "kind"],
       "additionalProperties": false,
       "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "kind": {
-          "enum": ["scoring_platform", "prediction_market", "self_hosted", "internal", "informal"]
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "enum": ["scoring_platform", "prediction_market", "self_hosted", "internal", "informal"] },
+        "url": { "type": "string", "format": "uri" },
         "account": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "username": {
-              "type": "string",
-              "minLength": 1
-            },
-            "user_id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "profile_url": {
-              "type": "string",
-              "format": "uri"
-            }
+            "username": { "$ref": "#/$defs/nonEmptyString" },
+            "user_id": { "$ref": "#/$defs/nonEmptyString" },
+            "profile_url": { "type": "string", "format": "uri" }
           },
           "minProperties": 1
         }
       }
     },
-    "platformRef": {
+    "artifactSnapshot": {
       "type": "object",
-      "required": ["platform"],
+      "required": ["artifact_path", "media_type", "digest"],
       "additionalProperties": false,
       "properties": {
-        "platform": {
-          "$ref": "#/$defs/slug"
-        },
-        "question_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        }
+        "artifact_path": { "$ref": "#/$defs/relativePath" },
+        "media_type": { "$ref": "#/$defs/nonEmptyString" },
+        "digest": { "$ref": "#/$defs/sha256" }
       }
     },
-    "forecastWindow": {
+    "importer": {
       "type": "object",
-      "required": ["opens_at"],
+      "required": ["name", "version"],
       "additionalProperties": false,
       "properties": {
-        "opens_at": {
-          "$ref": "#/$defs/timestamp"
-        }
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "version": { "$ref": "#/$defs/nonEmptyString" }
       }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["platform", "remote_object_id", "retrieved_at"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": { "$ref": "#/$defs/slug" },
+        "remote_object_id": { "$ref": "#/$defs/nonEmptyString" },
+        "remote_object_version": { "$ref": "#/$defs/nonEmptyString" },
+        "url": { "type": "string", "format": "uri" },
+        "source_created_at": { "$ref": "#/$defs/timestamp" },
+        "source_updated_at": { "$ref": "#/$defs/timestamp" },
+        "retrieved_at": { "$ref": "#/$defs/timestamp" },
+        "snapshot": { "$ref": "#/$defs/artifactSnapshot" },
+        "importer": { "$ref": "#/$defs/importer" }
+      },
+      "description": "Platform timestamps are source claims. A snapshot digest makes imported bytes independently checkable."
     },
     "option": {
       "type": "object",
       "required": ["id", "label"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "label": {
-          "type": "string",
-          "minLength": 1
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "optionSet": {
+      "type": "object",
+      "required": ["id", "version", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "type": "integer", "minimum": 1 },
+        "options": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/option" } }
+      }
+    },
+    "optionSetRef": {
+      "type": "object",
+      "required": ["id", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     },
     "unit": {
@@ -334,201 +242,333 @@
       "required": ["name"],
       "additionalProperties": false,
       "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "symbol": {
-          "type": "string",
-          "minLength": 1
-        },
-        "ucum_code": {
-          "type": "string",
-          "minLength": 1
-        }
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "symbol": { "$ref": "#/$defs/nonEmptyString" },
+        "ucum_code": { "$ref": "#/$defs/nonEmptyString" }
       }
     },
-    "decimal": {
-      "type": "string",
-      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-      "description": "An exact decimal encoded as a string. Leading zeros and non-finite values are forbidden."
-    },
-    "binaryValue": {
+    "bound": {
       "type": "object",
-      "required": ["kind", "probability_bp"],
+      "required": ["value", "inclusive"],
       "additionalProperties": false,
       "properties": {
-        "kind": {
-          "const": "binary"
-        },
-        "probability_bp": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10000,
-          "description": "Probability of YES in basis points."
-        }
+        "value": { "type": "string", "minLength": 1 },
+        "inclusive": { "type": "boolean" }
       }
     },
-    "choiceProbability": {
+    "bounds": {
       "type": "object",
-      "required": ["option_id", "probability_bp"],
       "additionalProperties": false,
       "properties": {
-        "option_id": {
-          "$ref": "#/$defs/slug"
-        },
-        "probability_bp": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10000
-        }
-      }
+        "lower": { "$ref": "#/$defs/bound" },
+        "upper": { "$ref": "#/$defs/bound" }
+      },
+      "minProperties": 1
     },
-    "multipleChoiceValue": {
+    "bin": {
       "type": "object",
-      "required": ["kind", "probabilities"],
+      "required": ["id", "lower", "upper", "lower_inclusive", "upper_inclusive"],
       "additionalProperties": false,
       "properties": {
-        "kind": {
-          "const": "multiple_choice"
-        },
-        "probabilities": {
-          "type": "array",
-          "minItems": 2,
-          "items": {
-            "$ref": "#/$defs/choiceProbability"
-          }
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "$ref": "#/$defs/nonEmptyString" },
+        "lower": { "type": "string", "minLength": 1 },
+        "upper": { "type": "string", "minLength": 1 },
+        "lower_inclusive": { "type": "boolean" },
+        "upper_inclusive": { "type": "boolean" }
       }
     },
-    "numericInterval": {
+    "binSet": {
       "type": "object",
-      "required": ["lower", "upper", "credibility_bp"],
+      "required": ["id", "version", "bins"],
       "additionalProperties": false,
       "properties": {
-        "lower": {
-          "$ref": "#/$defs/decimal"
-        },
-        "upper": {
-          "$ref": "#/$defs/decimal"
-        },
-        "credibility_bp": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "type": "integer", "minimum": 1 },
+        "bins": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/bin" } }
       }
     },
-    "numericQuantile": {
+    "binSetRef": {
       "type": "object",
-      "required": ["probability_bp", "value"],
+      "required": ["id", "version"],
       "additionalProperties": false,
       "properties": {
-        "probability_bp": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9999
-        },
-        "value": {
-          "$ref": "#/$defs/decimal"
-        }
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     },
-    "numericValue": {
+    "continuousValues": {
       "type": "object",
       "required": ["kind"],
       "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "const": "numeric"
-        },
-        "point": {
-          "$ref": "#/$defs/decimal"
-        },
-        "interval": {
-          "$ref": "#/$defs/numericInterval"
-        },
-        "quantiles": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/numericQuantile"
-          }
-        }
-      },
-      "anyOf": [
-        { "required": ["point"] },
-        { "required": ["interval"] },
-        { "required": ["quantiles"] }
-      ]
+      "properties": { "kind": { "const": "continuous" } }
     },
-    "dateInterval": {
+    "stepValues": {
       "type": "object",
-      "required": ["lower", "upper", "credibility_bp"],
+      "required": ["kind", "step"],
       "additionalProperties": false,
       "properties": {
-        "lower": {
-          "$ref": "#/$defs/date"
-        },
-        "upper": {
-          "$ref": "#/$defs/date"
-        },
-        "credibility_bp": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
-        }
+        "kind": { "const": "step" },
+        "step": { "type": "string", "minLength": 1 },
+        "origin": { "type": "string", "minLength": 1 }
       }
     },
-    "dateQuantile": {
+    "allowedValues": {
       "type": "object",
-      "required": ["probability_bp", "value"],
+      "required": ["kind", "values"],
       "additionalProperties": false,
       "properties": {
-        "probability_bp": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9999
-        },
-        "value": {
-          "$ref": "#/$defs/date"
-        }
+        "kind": { "const": "allowed_values" },
+        "values": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
       }
     },
-    "dateValue": {
+    "binaryDomain": {
       "type": "object",
       "required": ["kind"],
       "additionalProperties": false,
-      "properties": {
-        "kind": {
-          "const": "date"
-        },
-        "point": {
-          "$ref": "#/$defs/date"
-        },
-        "interval": {
-          "$ref": "#/$defs/dateInterval"
-        },
-        "quantiles": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/dateQuantile"
-          }
-        }
-      },
-      "anyOf": [
-        { "required": ["point"] },
-        { "required": ["interval"] },
-        { "required": ["quantiles"] }
-      ]
+      "properties": { "kind": { "const": "binary" } }
     },
-    "forecastValue": {
+    "categoricalDomain": {
+      "type": "object",
+      "required": ["kind", "option_set"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "categorical" },
+        "option_set": { "$ref": "#/$defs/optionSet" }
+      }
+    },
+    "ordinalDomain": {
+      "type": "object",
+      "required": ["kind", "option_set"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "ordinal" },
+        "option_set": { "$ref": "#/$defs/optionSet" }
+      }
+    },
+    "numericDomain": {
+      "type": "object",
+      "required": ["kind", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "numeric" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "values": {
+          "oneOf": [
+            { "$ref": "#/$defs/continuousValues" },
+            { "$ref": "#/$defs/stepValues" },
+            { "$ref": "#/$defs/allowedValues" }
+          ]
+        },
+        "elicitation_scale": { "enum": ["linear", "log"] },
+        "unit": { "$ref": "#/$defs/unit" },
+        "bin_sets": { "type": "array", "items": { "$ref": "#/$defs/binSet" } }
+      }
+    },
+    "dateDomain": {
+      "type": "object",
+      "required": ["kind", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "date" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "values": {
+          "oneOf": [
+            { "$ref": "#/$defs/continuousValues" },
+            { "$ref": "#/$defs/stepValues" },
+            { "$ref": "#/$defs/allowedValues" }
+          ]
+        },
+        "bin_sets": { "type": "array", "items": { "$ref": "#/$defs/binSet" } }
+      }
+    },
+    "datetimeDomain": {
+      "type": "object",
+      "required": ["kind", "values"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "datetime" },
+        "bounds": { "$ref": "#/$defs/bounds" },
+        "values": {
+          "oneOf": [
+            { "$ref": "#/$defs/continuousValues" },
+            { "$ref": "#/$defs/stepValues" },
+            { "$ref": "#/$defs/allowedValues" }
+          ]
+        },
+        "bin_sets": { "type": "array", "items": { "$ref": "#/$defs/binSet" } }
+      }
+    },
+    "domain": {
       "oneOf": [
-        { "$ref": "#/$defs/binaryValue" },
-        { "$ref": "#/$defs/multipleChoiceValue" },
-        { "$ref": "#/$defs/numericValue" },
-        { "$ref": "#/$defs/dateValue" }
+        { "$ref": "#/$defs/binaryDomain" },
+        { "$ref": "#/$defs/categoricalDomain" },
+        { "$ref": "#/$defs/ordinalDomain" },
+        { "$ref": "#/$defs/numericDomain" },
+        { "$ref": "#/$defs/dateDomain" },
+        { "$ref": "#/$defs/datetimeDomain" }
+      ]
+    },
+    "outcomeSpace": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["binary", "categorical", "ordinal", "numeric", "date", "datetime"] }
+      }
+    },
+    "questionRevision": {
+      "type": "object",
+      "required": ["id", "effective_at", "recorded_at", "title", "resolution_criteria", "expected_resolution_at", "outcome_space", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "effective_at": { "$ref": "#/$defs/timestamp" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "resolution_criteria": { "$ref": "#/$defs/nonEmptyString" },
+        "forecasting_opens_at": { "$ref": "#/$defs/timestamp" },
+        "expected_resolution_at": { "$ref": "#/$defs/timestamp" },
+        "outcome_space": { "$ref": "#/$defs/outcomeSpace" },
+        "domain": { "$ref": "#/$defs/domain" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "scalarValue": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "minLength": 1 }
+      ]
+    },
+    "probabilityRepresentation": {
+      "type": "object",
+      "required": ["kind", "outcome", "probability"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "probability" },
+        "outcome": { "const": true },
+        "probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "pmfEntry": {
+      "type": "object",
+      "required": ["option_id", "probability"],
+      "additionalProperties": false,
+      "properties": {
+        "option_id": { "$ref": "#/$defs/slug" },
+        "probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "pmfRepresentation": {
+      "type": "object",
+      "required": ["kind", "option_set_ref", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "pmf" },
+        "option_set_ref": { "$ref": "#/$defs/optionSetRef" },
+        "entries": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/pmfEntry" } }
+      }
+    },
+    "binnedPmfEntry": {
+      "type": "object",
+      "required": ["bin_id", "probability"],
+      "additionalProperties": false,
+      "properties": {
+        "bin_id": { "$ref": "#/$defs/slug" },
+        "probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "binnedPmfRepresentation": {
+      "type": "object",
+      "required": ["kind", "bin_set_ref", "entries", "left_tail_probability", "right_tail_probability"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "binned_pmf" },
+        "bin_set_ref": { "$ref": "#/$defs/binSetRef" },
+        "entries": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/binnedPmfEntry" } },
+        "left_tail_probability": { "$ref": "#/$defs/probability" },
+        "right_tail_probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "quantilePoint": {
+      "type": "object",
+      "required": ["level", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "level": { "$ref": "#/$defs/openProbability" },
+        "value": { "$ref": "#/$defs/scalarValue" }
+      }
+    },
+    "quantilesRepresentation": {
+      "type": "object",
+      "required": ["kind", "interpolation", "points"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "quantiles" },
+        "interpolation": { "enum": ["none", "linear", "step_lower", "step_upper"] },
+        "points": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/quantilePoint" } }
+      }
+    },
+    "cdfPoint": {
+      "type": "object",
+      "required": ["value", "probability"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "$ref": "#/$defs/scalarValue" },
+        "probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "cdfRepresentation": {
+      "type": "object",
+      "required": ["kind", "interpolation", "points", "left_tail_probability", "right_tail_probability"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "cdf" },
+        "interpolation": { "enum": ["step_right", "linear"] },
+        "points": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/cdfPoint" } },
+        "left_tail_probability": { "$ref": "#/$defs/probability" },
+        "right_tail_probability": { "$ref": "#/$defs/probability" }
+      }
+    },
+    "pointRepresentation": {
+      "type": "object",
+      "required": ["kind", "statistic", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "point" },
+        "statistic": { "enum": ["mean", "median", "mode", "best_estimate"] },
+        "value": { "$ref": "#/$defs/scalarValue" }
+      }
+    },
+    "credibleInterval": {
+      "type": "object",
+      "required": ["coverage", "interval_kind", "lower", "upper"],
+      "additionalProperties": false,
+      "properties": {
+        "coverage": { "$ref": "#/$defs/openProbability" },
+        "interval_kind": { "enum": ["equal_tailed", "central", "highest_density", "author_selected"] },
+        "lower": { "$ref": "#/$defs/scalarValue" },
+        "upper": { "$ref": "#/$defs/scalarValue" }
+      }
+    },
+    "credibleIntervalsRepresentation": {
+      "type": "object",
+      "required": ["kind", "intervals"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "credible_intervals" },
+        "intervals": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/credibleInterval" } }
+      }
+    },
+    "forecastRepresentation": {
+      "oneOf": [
+        { "$ref": "#/$defs/probabilityRepresentation" },
+        { "$ref": "#/$defs/pmfRepresentation" },
+        { "$ref": "#/$defs/binnedPmfRepresentation" },
+        { "$ref": "#/$defs/quantilesRepresentation" },
+        { "$ref": "#/$defs/cdfRepresentation" },
+        { "$ref": "#/$defs/pointRepresentation" },
+        { "$ref": "#/$defs/credibleIntervalsRepresentation" }
       ]
     },
     "forecastTarget": {
@@ -536,93 +576,39 @@
       "required": ["scope", "canonicalization", "artifact_path", "digest"],
       "additionalProperties": false,
       "properties": {
-        "scope": {
-          "const": "forecast-envelope/v1"
-        },
-        "canonicalization": {
-          "const": "RFC8785"
-        },
-        "artifact_path": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "digest": {
-          "$ref": "#/$defs/sha256"
-        }
+        "scope": { "const": "forecast-envelope/v2" },
+        "canonicalization": { "const": "RFC8785" },
+        "artifact_path": { "$ref": "#/$defs/relativePath" },
+        "digest": { "$ref": "#/$defs/sha256" }
       }
     },
     "rfc3161Timestamp": {
       "type": "object",
-      "required": [
-        "type",
-        "request_path",
-        "response_path",
-        "tsa_url",
-        "hash_algorithm",
-        "state"
-      ],
+      "required": ["type", "request_path", "response_path", "tsa_url", "hash_algorithm", "state"],
       "additionalProperties": false,
       "properties": {
-        "type": {
-          "const": "rfc3161"
-        },
-        "request_path": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "response_path": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "tsa_url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "hash_algorithm": {
-          "const": "sha256"
-        },
-        "state": {
-          "enum": ["pending", "verified"]
-        },
-        "gen_time": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "policy_oid": {
-          "type": "string",
-          "pattern": "^[0-2](?:\\.(?:0|[1-9][0-9]*))+$"
-        },
-        "serial_number": {
-          "type": "string",
-          "minLength": 1
-        },
-        "ca_bundle_path": {
-          "$ref": "#/$defs/relativePath"
-        }
+        "type": { "const": "rfc3161" },
+        "request_path": { "$ref": "#/$defs/relativePath" },
+        "response_path": { "$ref": "#/$defs/relativePath" },
+        "tsa_url": { "type": "string", "format": "uri" },
+        "hash_algorithm": { "const": "sha256" },
+        "state": { "enum": ["pending", "verified"] },
+        "gen_time": { "$ref": "#/$defs/timestamp" },
+        "policy_oid": { "type": "string", "pattern": "^[0-2](?:\\.(?:0|[1-9][0-9]*))+$" },
+        "serial_number": { "$ref": "#/$defs/nonEmptyString" },
+        "ca_bundle_path": { "$ref": "#/$defs/relativePath" }
       },
-      "if": {
-        "properties": {
-          "state": {
-            "const": "verified"
-          }
-        },
-        "required": ["state"]
-      },
-      "then": {
-        "required": ["gen_time", "policy_oid", "serial_number", "ca_bundle_path"]
-      }
+      "if": { "properties": { "state": { "const": "verified" } }, "required": ["state"] },
+      "then": { "required": ["gen_time", "policy_oid", "serial_number", "ca_bundle_path"] }
     },
     "externalAnchor": {
       "type": "object",
       "required": ["kind", "value"],
       "additionalProperties": false,
       "properties": {
-        "kind": {
-          "enum": ["git_commit", "url", "nostr_event", "blockchain_transaction"]
-        },
-        "value": {
-          "type": "string",
-          "minLength": 1
-        },
-        "observed_at": {
-          "$ref": "#/$defs/timestamp"
-        }
+        "kind": { "enum": ["git_commit", "url", "nostr_event", "blockchain_transaction"] },
+        "value": { "$ref": "#/$defs/nonEmptyString" },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
       }
     },
     "integrityUnanchored": {
@@ -630,13 +616,8 @@
       "required": ["status"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "const": "unanchored"
-        },
-        "note": {
-          "type": "string",
-          "minLength": 1
-        }
+        "status": { "const": "unanchored" },
+        "note": { "$ref": "#/$defs/nonEmptyString" }
       }
     },
     "integrityPending": {
@@ -644,25 +625,10 @@
       "required": ["status", "target", "timestamps"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "const": "pending"
-        },
-        "target": {
-          "$ref": "#/$defs/forecastTarget"
-        },
-        "timestamps": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/rfc3161Timestamp"
-          }
-        },
-        "external_anchors": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/externalAnchor"
-          }
-        }
+        "status": { "const": "pending" },
+        "target": { "$ref": "#/$defs/forecastTarget" },
+        "timestamps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rfc3161Timestamp" } },
+        "external_anchors": { "type": "array", "items": { "$ref": "#/$defs/externalAnchor" } }
       }
     },
     "integrityVerified": {
@@ -670,41 +636,21 @@
       "required": ["status", "target", "timestamps", "verified_at"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "const": "verified"
-        },
-        "target": {
-          "$ref": "#/$defs/forecastTarget"
-        },
+        "status": { "const": "verified" },
+        "target": { "$ref": "#/$defs/forecastTarget" },
         "timestamps": {
           "type": "array",
           "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/rfc3161Timestamp"
-          },
+          "items": { "$ref": "#/$defs/rfc3161Timestamp" },
           "contains": {
             "type": "object",
-            "properties": {
-              "type": {
-                "const": "rfc3161"
-              },
-              "state": {
-                "const": "verified"
-              }
-            },
+            "properties": { "type": { "const": "rfc3161" }, "state": { "const": "verified" } },
             "required": ["type", "state"]
           },
           "minContains": 1
         },
-        "verified_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "external_anchors": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/externalAnchor"
-          }
-        }
+        "verified_at": { "$ref": "#/$defs/timestamp" },
+        "external_anchors": { "type": "array", "items": { "$ref": "#/$defs/externalAnchor" } }
       }
     },
     "integrityFailed": {
@@ -712,22 +658,10 @@
       "required": ["status", "failure_reason"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "const": "failed"
-        },
-        "failure_reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "target": {
-          "$ref": "#/$defs/forecastTarget"
-        },
-        "timestamps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/rfc3161Timestamp"
-          }
-        }
+        "status": { "const": "failed" },
+        "failure_reason": { "$ref": "#/$defs/nonEmptyString" },
+        "target": { "$ref": "#/$defs/forecastTarget" },
+        "timestamps": { "type": "array", "items": { "$ref": "#/$defs/rfc3161Timestamp" } }
       }
     },
     "integrity": {
@@ -743,15 +677,9 @@
       "required": ["algorithm", "nonce", "ciphertext"],
       "additionalProperties": false,
       "properties": {
-        "algorithm": {
-          "const": "chacha20-poly1305"
-        },
-        "nonce": {
-          "$ref": "#/$defs/base64Nonce12"
-        },
-        "ciphertext": {
-          "$ref": "#/$defs/base64Ciphertext"
-        }
+        "algorithm": { "const": "chacha20-poly1305" },
+        "nonce": { "$ref": "#/$defs/base64Nonce12" },
+        "ciphertext": { "$ref": "#/$defs/base64Ciphertext" }
       }
     },
     "sealedCommitment": {
@@ -759,19 +687,10 @@
       "required": ["scheme", "commitment_hash", "encryption", "key_hint"],
       "additionalProperties": false,
       "properties": {
-        "scheme": {
-          "const": "forecast-seal/v1"
-        },
-        "commitment_hash": {
-          "$ref": "#/$defs/sha256"
-        },
-        "encryption": {
-          "$ref": "#/$defs/encryption"
-        },
-        "key_hint": {
-          "type": "string",
-          "minLength": 1
-        }
+        "scheme": { "const": "forecast-seal/v2" },
+        "commitment_hash": { "$ref": "#/$defs/sha256" },
+        "encryption": { "$ref": "#/$defs/encryption" },
+        "key_hint": { "$ref": "#/$defs/nonEmptyString" }
       }
     },
     "revealedCommitment": {
@@ -779,118 +698,72 @@
       "required": ["scheme", "commitment_hash", "encryption", "key_hint", "revealed_at", "revealed_key"],
       "additionalProperties": false,
       "properties": {
-        "scheme": {
-          "const": "forecast-seal/v1"
-        },
-        "commitment_hash": {
-          "$ref": "#/$defs/sha256"
-        },
-        "encryption": {
-          "$ref": "#/$defs/encryption"
-        },
-        "key_hint": {
-          "type": "string",
-          "minLength": 1
-        },
-        "revealed_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "revealed_key": {
-          "$ref": "#/$defs/hex32"
-        }
+        "scheme": { "const": "forecast-seal/v2" },
+        "commitment_hash": { "$ref": "#/$defs/sha256" },
+        "encryption": { "$ref": "#/$defs/encryption" },
+        "key_hint": { "$ref": "#/$defs/nonEmptyString" },
+        "revealed_at": { "$ref": "#/$defs/timestamp" },
+        "revealed_key": { "$ref": "#/$defs/hex32" }
+      }
+    },
+    "lifecycleEvent": {
+      "type": "object",
+      "required": ["id", "type", "effective_at", "recorded_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "type": { "enum": ["withdrawn", "expired", "reaffirmed"] },
+        "effective_at": { "$ref": "#/$defs/timestamp" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "reason": { "$ref": "#/$defs/nonEmptyString" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "forecast": {
       "type": "object",
-      "required": ["id", "forecasted_at", "recorded_at", "visibility", "integrity"],
+      "required": ["id", "question_revision_id", "forecasted_at", "recorded_at", "visibility", "integrity"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "forecasted_at": {
-          "$ref": "#/$defs/timestamp",
-          "description": "The forecaster's self-reported forecast time."
-        },
-        "recorded_at": {
-          "$ref": "#/$defs/timestamp",
-          "description": "When this record was written to the ledger."
-        },
-        "visibility": {
-          "enum": ["public", "sealed", "revealed"]
-        },
-        "value": {
-          "$ref": "#/$defs/forecastValue"
-        },
-        "rationale": {
-          "type": "string"
-        },
-        "key_factors": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "comment": {
-          "type": "string"
-        },
-        "public_note": {
-          "type": "string",
-          "description": "Non-secret context that remains visible while a forecast is sealed."
-        },
-        "supersedes_forecast_id": {
-          "$ref": "#/$defs/slug"
-        },
+        "id": { "$ref": "#/$defs/slug" },
+        "question_revision_id": { "$ref": "#/$defs/slug" },
+        "forecasted_at": { "$ref": "#/$defs/timestamp" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "visibility": { "enum": ["public", "sealed", "revealed"] },
+        "representations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/forecastRepresentation" } },
+        "rationale": { "type": "string" },
+        "key_factors": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "comment": { "type": "string" },
+        "public_note": { "type": "string" },
+        "supersedes_forecast_id": { "$ref": "#/$defs/slug" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "lifecycle_events": { "type": "array", "items": { "$ref": "#/$defs/lifecycleEvent" } },
         "commitment": {
           "oneOf": [
             { "$ref": "#/$defs/sealedCommitment" },
             { "$ref": "#/$defs/revealedCommitment" }
           ]
         },
-        "integrity": {
-          "$ref": "#/$defs/integrity"
-        }
+        "integrity": { "$ref": "#/$defs/integrity" }
       },
       "oneOf": [
         {
-          "properties": {
-            "visibility": {
-              "const": "public"
-            }
-          },
-          "required": ["value"],
-          "not": {
-            "required": ["commitment"]
-          }
+          "properties": { "visibility": { "const": "public" } },
+          "required": ["representations"],
+          "not": { "required": ["commitment"] }
         },
         {
-          "properties": {
-            "visibility": {
-              "const": "sealed"
-            },
-            "commitment": {
-              "$ref": "#/$defs/sealedCommitment"
-            }
-          },
+          "properties": { "visibility": { "const": "sealed" }, "commitment": { "$ref": "#/$defs/sealedCommitment" } },
           "required": ["commitment"],
           "allOf": [
-            { "not": { "required": ["value"] } },
+            { "not": { "required": ["representations"] } },
             { "not": { "required": ["rationale"] } },
             { "not": { "required": ["key_factors"] } },
             { "not": { "required": ["comment"] } }
           ]
         },
         {
-          "properties": {
-            "visibility": {
-              "const": "revealed"
-            },
-            "commitment": {
-              "$ref": "#/$defs/revealedCommitment"
-            }
-          },
-          "required": ["value", "rationale", "key_factors", "comment", "commitment"]
+          "properties": { "visibility": { "const": "revealed" }, "commitment": { "$ref": "#/$defs/revealedCommitment" } },
+          "required": ["representations", "rationale", "key_factors", "comment", "commitment"]
         }
       ]
     },
@@ -899,355 +772,124 @@
       "required": ["title", "url", "retrieved_at"],
       "additionalProperties": false,
       "properties": {
-        "title": {
-          "type": "string",
-          "minLength": 1
-        },
-        "publisher": {
-          "type": "string",
-          "minLength": 1
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "published_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "retrieved_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "content_digest": {
-          "$ref": "#/$defs/sha256"
-        }
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "publisher": { "$ref": "#/$defs/nonEmptyString" },
+        "url": { "type": "string", "format": "uri" },
+        "published_at": { "$ref": "#/$defs/timestamp" },
+        "retrieved_at": { "$ref": "#/$defs/timestamp" },
+        "content_digest": { "$ref": "#/$defs/sha256" }
       }
     },
     "resolvedResolution": {
       "type": "object",
-      "required": ["status", "outcome", "outcome_known_at", "recorded_at", "sources"],
+      "required": ["status", "question_revision_id", "outcome", "outcome_known_at", "recorded_at", "sources"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "const": "resolved"
-        },
-        "outcome": {},
-        "outcome_known_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "recorded_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "sources": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/resolutionSource"
-          }
-        },
-        "notes": {
-          "type": "string"
-        }
+        "status": { "const": "resolved" },
+        "question_revision_id": { "$ref": "#/$defs/slug" },
+        "outcome": { "$ref": "#/$defs/scalarValue" },
+        "outcome_known_at": { "$ref": "#/$defs/timestamp" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "sources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/resolutionSource" } },
+        "notes": { "type": "string" }
       }
     },
-    "nonResolvedResolution": {
+    "unresolvedResolution": {
       "type": "object",
       "required": ["status", "reason", "recorded_at"],
       "additionalProperties": false,
       "properties": {
-        "status": {
-          "enum": ["annulled", "disputed"]
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "recorded_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "sources": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/resolutionSource"
-          }
-        }
+        "status": { "enum": ["ambiguous", "void", "disputed"] },
+        "reason": { "$ref": "#/$defs/nonEmptyString" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "sources": { "type": "array", "items": { "$ref": "#/$defs/resolutionSource" } }
+      }
+    },
+    "notApplicableResolution": {
+      "type": "object",
+      "required": ["status", "relationship_id", "reason", "recorded_at"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "not_applicable" },
+        "relationship_id": { "$ref": "#/$defs/slug" },
+        "reason": { "$ref": "#/$defs/nonEmptyString" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" }
       }
     },
     "resolution": {
       "oneOf": [
         { "$ref": "#/$defs/resolvedResolution" },
-        { "$ref": "#/$defs/nonResolvedResolution" }
+        { "$ref": "#/$defs/unresolvedResolution" },
+        { "$ref": "#/$defs/notApplicableResolution" }
+      ]
+    },
+    "group": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "groupMembership": {
+      "type": "object",
+      "required": ["id", "kind", "group_id", "question_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "kind": { "const": "group_membership" },
+        "group_id": { "$ref": "#/$defs/slug" },
+        "question_id": { "$ref": "#/$defs/slug" }
+      }
+    },
+    "conditionalRelationship": {
+      "type": "object",
+      "required": ["id", "kind", "parent_question_id", "parent_question_revision_id", "parent_outcome", "child_question_id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "kind": { "const": "conditional" },
+        "parent_question_id": { "$ref": "#/$defs/slug" },
+        "parent_question_revision_id": { "$ref": "#/$defs/slug" },
+        "parent_outcome": { "$ref": "#/$defs/scalarValue" },
+        "child_question_id": { "$ref": "#/$defs/slug" }
+      }
+    },
+    "relationship": {
+      "oneOf": [
+        { "$ref": "#/$defs/groupMembership" },
+        { "$ref": "#/$defs/conditionalRelationship" }
       ]
     },
     "question": {
       "type": "object",
-      "required": [
-        "id",
-        "title",
-        "type",
-        "status",
-        "resolution_criteria",
-        "created_at",
-        "expected_resolution_at",
-        "forecasts"
-      ],
+      "required": ["id", "status", "created_at", "current_revision_id", "revisions", "forecasts"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/slug"
-        },
-        "title": {
-          "type": "string",
-          "minLength": 1
-        },
-        "type": {
-          "enum": ["binary", "multiple_choice", "numeric", "date"]
-        },
-        "status": {
-          "enum": ["open", "closed", "awaiting_resolution", "resolved", "annulled", "disputed"],
-          "description": "A self-reported lifecycle status set by the forecaster and auditable through Git history."
-        },
-        "resolution_criteria": {
-          "type": "string",
-          "minLength": 1
-        },
-        "created_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "forecast_window": {
-          "$ref": "#/$defs/forecastWindow"
-        },
-        "expected_resolution_at": {
-          "$ref": "#/$defs/timestamp"
-        },
-        "options": {
-          "type": "array",
-          "minItems": 2,
-          "items": {
-            "$ref": "#/$defs/option"
-          }
-        },
-        "unit": {
-          "$ref": "#/$defs/unit"
-        },
-        "platform_refs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/platformRef"
-          }
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/slug"
-          },
-          "uniqueItems": true
-        },
-        "notes": {
-          "type": "string"
-        },
+        "id": { "$ref": "#/$defs/slug" },
+        "status": { "enum": ["open", "closed", "awaiting_resolution", "resolved", "ambiguous", "void", "disputed", "not_applicable"] },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "current_revision_id": { "$ref": "#/$defs/slug" },
+        "revisions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/questionRevision" } },
+        "tags": { "type": "array", "items": { "$ref": "#/$defs/slug" }, "uniqueItems": true },
+        "notes": { "type": "string" },
         "forecasts": {
           "type": "array",
-          "description": "Forecasts recorded for this question. An empty array is a valid backlog or handoff state.",
-          "items": {
-            "$ref": "#/$defs/forecast"
-          }
+          "description": "An empty array is a valid backlog or handoff state.",
+          "items": { "$ref": "#/$defs/forecast" }
         },
-        "resolution": {
-          "$ref": "#/$defs/resolution"
-        }
+        "resolution": { "$ref": "#/$defs/resolution" }
       },
       "allOf": [
         {
-          "if": {
-            "properties": {
-              "type": { "const": "binary" }
-            },
-            "required": ["type"]
-          },
-          "then": {
-            "allOf": [
-              { "not": { "required": ["options"] } },
-              { "not": { "required": ["unit"] } },
-              {
-                "properties": {
-                  "forecasts": {
-                    "items": {
-                      "properties": {
-                        "value": { "$ref": "#/$defs/binaryValue" }
-                      }
-                    }
-                  },
-                  "resolution": {
-                    "properties": {
-                      "outcome": { "type": "boolean" }
-                    }
-                  }
-                }
-              }
-            ]
-          }
+          "if": { "properties": { "status": { "enum": ["open", "closed", "awaiting_resolution"] } }, "required": ["status"] },
+          "then": { "not": { "required": ["resolution"] } }
         },
         {
-          "if": {
-            "properties": {
-              "type": { "const": "multiple_choice" }
-            },
-            "required": ["type"]
-          },
-          "then": {
-            "required": ["options"],
-            "allOf": [
-              { "not": { "required": ["unit"] } },
-              {
-                "properties": {
-                  "forecasts": {
-                    "items": {
-                      "properties": {
-                        "value": { "$ref": "#/$defs/multipleChoiceValue" }
-                      }
-                    }
-                  },
-                  "resolution": {
-                    "properties": {
-                      "outcome": { "$ref": "#/$defs/slug" }
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": { "const": "numeric" }
-            },
-            "required": ["type"]
-          },
-          "then": {
-            "required": ["unit"],
-            "allOf": [
-              { "not": { "required": ["options"] } },
-              {
-                "properties": {
-                  "forecasts": {
-                    "items": {
-                      "properties": {
-                        "value": { "$ref": "#/$defs/numericValue" }
-                      }
-                    }
-                  },
-                  "resolution": {
-                    "properties": {
-                      "outcome": { "$ref": "#/$defs/decimal" }
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": { "const": "date" }
-            },
-            "required": ["type"]
-          },
-          "then": {
-            "allOf": [
-              { "not": { "required": ["options"] } },
-              { "not": { "required": ["unit"] } },
-              {
-                "properties": {
-                  "forecasts": {
-                    "items": {
-                      "properties": {
-                        "value": { "$ref": "#/$defs/dateValue" }
-                      }
-                    }
-                  },
-                  "resolution": {
-                    "properties": {
-                      "outcome": { "$ref": "#/$defs/date" }
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": {
-                "enum": ["open", "closed", "awaiting_resolution"]
-              }
-            },
-            "required": ["status"]
-          },
-          "then": {
-            "not": {
-              "required": ["resolution"]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": { "const": "resolved" }
-            },
-            "required": ["status"]
-          },
-          "then": {
-            "required": ["resolution"],
-            "properties": {
-              "resolution": {
-                "properties": {
-                  "status": { "const": "resolved" }
-                },
-                "required": ["status"]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": { "const": "annulled" }
-            },
-            "required": ["status"]
-          },
-          "then": {
-            "required": ["resolution"],
-            "properties": {
-              "resolution": {
-                "properties": {
-                  "status": { "const": "annulled" }
-                },
-                "required": ["status"]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": { "const": "disputed" }
-            },
-            "required": ["status"]
-          },
-          "then": {
-            "required": ["resolution"],
-            "properties": {
-              "resolution": {
-                "properties": {
-                  "status": { "const": "disputed" }
-                },
-                "required": ["status"]
-              }
-            }
-          }
+          "if": { "properties": { "status": { "enum": ["resolved", "ambiguous", "void", "disputed", "not_applicable"] } }, "required": ["status"] },
+          "then": { "required": ["resolution"] }
         }
       ]
     }

@@ -24,6 +24,8 @@ python -m pip install -r requirements-dev.txt
 check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
 python tools/run_fixture_tests.py
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
+python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+python tools/verify_legacy.py
 ruff check tools
 ```
 
