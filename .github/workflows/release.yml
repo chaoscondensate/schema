@@ -34,6 +34,9 @@ jobs:
           python tools/run_fixture_tests.py
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+          python tools/run_target_tests.py
           python tools/verify_legacy.py
           ruff check tools
 
@@ -42,9 +45,11 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mkdir -p dist
-          tar -czf "dist/forecast-ledger-schema-${RELEASE_TAG}.tar.gz" \
-            schema examples docs research tests tools .github \
-            README.md LICENSE CONTRIBUTING.md SECURITY.md pyproject.toml requirements-dev.txt
+          RELEASE_COMMIT=$(git rev-parse "${RELEASE_TAG}^{commit}")
+          git archive --format=tar.gz \
+            --prefix="forecast-ledger-schema-${RELEASE_TAG}/" \
+            --output="dist/forecast-ledger-schema-${RELEASE_TAG}.tar.gz" \
+            "${RELEASE_COMMIT}"
           cp schema/forecast-ledger.schema.json \
             "dist/forecast-ledger-${RELEASE_TAG}.schema.json"
           cp examples/valid/individual-ledger.json \

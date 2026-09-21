@@ -70,10 +70,13 @@ SHA-256. It includes the full bound revision, not only its ID.
 }
 ```
 
-The builder includes every present forecast statement field supported by
-`public_forecast_envelope()`, including reasoning, supersession, provenance,
-and lifecycle events. It excludes `integrity`; otherwise adding the timestamp
-metadata would recursively change the timestamp target.
+The builder includes every present immutable forecast statement field supported
+by `public_forecast_envelope()`, including reasoning, supersession, and
+provenance. It excludes `integrity` to avoid a recursive target. It also excludes
+`lifecycle_events`: those append-only events change derived active state, not
+the recorded belief. Adding a withdrawal, expiry, or reaffirmation therefore
+does not change canonical target bytes, target SHA-256, or existing RFC 3161
+evidence.
 
 Binding the complete revision prevents a valid timestamp from being reinterpreted
 under later wording, options, bounds, units, bins, or resolution criteria.
@@ -101,6 +104,9 @@ contains the visible IDs and times plus:
 `key_hint` is excluded because it is an operational pointer that may rotate
 without changing the sealed claim. `revealed_at` and `revealed_key` are excluded
 so rebuilding a revealed forecast produces the original sealed target.
+`lifecycle_events` is excluded for the same activity-metadata reason; the
+original sealed target remains byte-for-byte reproducible after an event is
+appended.
 
 ## `forecast-seal/v2`
 
@@ -281,20 +287,27 @@ OpenSSL checks above.
 - A platform's `source_created_at` or `source_updated_at` is provenance, not a
   cryptographic time claim.
 
-## Test vectors and frozen v1 bytes
+## Test vectors and frozen release bytes
 
-Verify both vectors:
+Verify seal and target vectors:
 
 ```bash
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+python tools/run_target_tests.py
 python tools/verify_legacy.py
 ```
 
-The v2 vector fixes every input, including salt, key, and nonce, for
-cross-language conformance. The v1 vector and v1.3.0 schema must remain
-byte-for-byte equal to the files at the `v1.3.0` tag. `verify_legacy.py` enforces
-their recorded SHA-256 digests.
+The v2 seal vector fixes every seal input, including salt, key, and nonce. The
+two target vectors fix exact canonical public and sealed envelope bytes plus
+SHA-256 while carrying lifecycle events that must not appear in those bytes.
+The lifecycle test proves that withdrawal, expiry, and reaffirmation leave both
+projections unchanged and that the reference builder reproduces the vectors.
+
+Frozen v1.3.0 and v2.0.0 artifacts must remain byte-for-byte equal to their
+tagged files. `verify_legacy.py` enforces their recorded SHA-256 manifests.
 
 ## External references
 

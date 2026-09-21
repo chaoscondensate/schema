@@ -1,4 +1,4 @@
-# v1.3.0 to v2.0.0 compatibility
+# v1.3.0 to v2 compatibility
 
 ## Decision
 
@@ -12,7 +12,7 @@ envelopes for v2 ledgers.
 
 ## Why a major version was required
 
-| Area | v1.3.0 | v2.0.0 | Compatibility |
+| Area | v1.3.0 | v2.0.x | Compatibility |
 | --- | --- | --- | --- |
 | Question definition | Mutable fields on question | Ordered immutable revisions | Breaking |
 | Forecast binding | Question ID | Exact question revision | Breaking |
@@ -65,19 +65,30 @@ An automated migration must stop or emit an explicit review item when:
 ## Consumer support policy
 
 Consumers should select behavior from `schema_version`, not feature detection.
-Supporting v1.3.0 and v2.0.0 means validating each document against its own
+Supporting v1.3.0 and v2.0.1 means validating each document against its own
 permanent schema and using the matching envelope/seal profile. There is no
 mixed-version ledger and no v2 envelope around a v1 forecast.
 
+## v2.0.1 normative erratum
+
+v2.0.1 corrects the `forecast-envelope/v2` projection so append-only
+`lifecycle_events` are outside both public and sealed timestamp targets. The
+events change derived active state, not the recorded belief. No ledger field or
+`forecast-seal/v2` byte changes.
+
+The v2.0.0 tag remains immutable. Verification of an artifact explicitly
+created under v2.0.0 uses that exact tagged contract. The current reference
+tools implement only the corrected v2.0.1 projection; they do not add a dual
+projection or automatic conversion path.
+
 ## Frozen legacy verification
 
-`tests/vectors/legacy-v1.3.0-sha256.json` records the expected hashes of the
-v1.3.0 schema and seal vector. Run:
+The legacy manifests record expected hashes for the v1.3.0 schema/seal vector
+and the v2.0.0 schema/seal vector/reference projection implementation. Run:
 
 ```bash
 python tools/verify_legacy.py
 ```
 
-The command reads those files directly from the `v1.3.0` Git tag and rejects
-any byte change or tag loss. The v2 release workflow runs this check before
-publication.
+The command reads those files directly from their Git tags and rejects any byte
+change or tag loss. The release workflow runs this check before publication.

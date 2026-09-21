@@ -17,6 +17,14 @@ a new major contract and permanent `$id`. Security-sensitive changes to
 canonicalization, commitment construction, encryption, or timestamp targets also
 require a new protocol version and test vectors.
 
+Before the contract has external adopters, a patch release may publish a
+normative erratum that corrects reference behavior to match already documented
+semantics while retaining the protocol identifier. Such an erratum must freeze
+the previous tag, publish exact regression vectors, identify the byte-level
+change in its release notes, and must not rewrite the previous release. Once
+external evidence depends on the affected behavior, the normal major-version and
+new-protocol rule applies instead.
+
 ## Development checks
 
 ```bash
@@ -25,6 +33,9 @@ check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
 python tools/run_fixture_tests.py
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+python tools/run_target_tests.py
 python tools/verify_legacy.py
 ruff check tools
 ```

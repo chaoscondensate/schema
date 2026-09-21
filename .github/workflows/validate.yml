@@ -33,10 +33,13 @@ jobs:
       - name: Run valid and invalid fixtures
         run: python tools/run_fixture_tests.py
 
-      - name: Verify cryptographic test vector
+      - name: Verify seal and target vectors
         run: |
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+          python tools/run_target_tests.py
           python tools/verify_legacy.py
 
       - name: Lint reference tools

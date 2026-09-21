@@ -265,7 +265,6 @@ def _included_forecast(forecast: dict[str, Any], *, sealed: bool) -> dict[str, A
             "public_note",
             "supersedes_forecast_id",
             "provenance",
-            "lifecycle_events",
         )
     else:
         included = {
@@ -284,7 +283,6 @@ def _included_forecast(forecast: dict[str, Any], *, sealed: bool) -> dict[str, A
                 "public_note",
                 "supersedes_forecast_id",
                 "provenance",
-                "lifecycle_events",
             )
             if key in forecast
         }
@@ -370,6 +368,35 @@ def verify_vector(vector: dict[str, Any]) -> None:
         raise AssertionError("revealed bundle differs from the input")
 
 
+def envelope_from_target_vector(vector: dict[str, Any]) -> dict[str, Any]:
+    """Build the public or sealed envelope described by a target vector."""
+
+    projection = vector["projection"]
+    if projection == "public":
+        return public_forecast_envelope(
+            vector["question_id"], vector["forecast"], vector["question_revision"]
+        )
+    if projection == "sealed":
+        return sealed_forecast_envelope(
+            vector["question_id"], vector["forecast"], vector["question_revision"]
+        )
+    raise ValueError(f"unsupported target projection: {projection}")
+
+
+def verify_target_vector(vector: dict[str, Any]) -> bytes:
+    """Verify exact canonical bytes and SHA-256 for an envelope target vector."""
+
+    data = canonicalize(envelope_from_target_vector(vector))
+    if data.decode("utf-8") != vector["expected"]["canonical_envelope"]:
+        raise AssertionError("canonical envelope differs from the target vector")
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != vector["expected"]["sha256"]:
+        raise AssertionError(
+            f"target SHA-256 is {actual}, expected {vector['expected']['sha256']}"
+        )
+    return data
+
+
 def _demo_vector(version: int) -> dict[str, Any]:
     if version == 1:
         bundle = {
@@ -439,13 +466,20 @@ def main() -> int:
     show_parser.add_argument("--version", type=int, choices=(1, 2), default=2)
     verify_parser = subparsers.add_parser("verify-vector", help="Verify a vector file")
     verify_parser.add_argument("path", type=Path)
+    target_parser = subparsers.add_parser(
+        "verify-target-vector", help="Verify an envelope target vector file"
+    )
+    target_parser.add_argument("path", type=Path)
     args = parser.parse_args()
 
     if args.command == "show-vector":
         print(json.dumps(_demo_vector(args.version), ensure_ascii=False, indent=2))
         return 0
     vector = json.loads(args.path.read_text(encoding="utf-8"))
-    verify_vector(vector)
+    if args.command == "verify-target-vector":
+        verify_target_vector(vector)
+    else:
+        verify_vector(vector)
     print(f"ok: {args.path}")
     return 0
 

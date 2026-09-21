@@ -10,31 +10,36 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "tests/vectors/legacy-v1.3.0-sha256.json"
+MANIFEST_GLOB = "legacy-v*.json"
 
 
 def main() -> int:
-    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    tag = manifest["tag"]
     failed = False
-    for path, expected in manifest["files"].items():
-        try:
-            content = subprocess.run(
-                ["git", "show", f"{tag}:{path}"],
-                cwd=ROOT,
-                check=True,
-                capture_output=True,
-            ).stdout
-        except subprocess.CalledProcessError as error:
-            failed = True
-            print(f"FAIL {tag}:{path}: {error.stderr.decode().strip()}")
-            continue
-        actual = hashlib.sha256(content).hexdigest()
-        if actual != expected:
-            failed = True
-            print(f"FAIL {tag}:{path}: SHA-256 {actual}, expected {expected}")
-        else:
-            print(f"OK   {tag}:{path} {actual}")
+    manifests = sorted((ROOT / "tests/vectors").glob(MANIFEST_GLOB))
+    if not manifests:
+        print(f"FAIL no manifests match tests/vectors/{MANIFEST_GLOB}")
+        return 1
+    for manifest_path in manifests:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        tag = manifest["tag"]
+        for path, expected in manifest["files"].items():
+            try:
+                content = subprocess.run(
+                    ["git", "show", f"{tag}:{path}"],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            except subprocess.CalledProcessError as error:
+                failed = True
+                print(f"FAIL {tag}:{path}: {error.stderr.decode().strip()}")
+                continue
+            actual = hashlib.sha256(content).hexdigest()
+            if actual != expected:
+                failed = True
+                print(f"FAIL {tag}:{path}: SHA-256 {actual}, expected {expected}")
+            else:
+                print(f"OK   {tag}:{path} {actual}")
     return 1 if failed else 0
 
 

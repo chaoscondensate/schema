@@ -16,16 +16,11 @@ from forecast_crypto import (
 from validate import load_document
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("ledger", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("proofs/targets"))
-    args = parser.parse_args()
+def build_targets(ledger: dict, output: Path) -> list[dict]:
+    """Write one canonical v2 envelope per forecast and return the build report."""
 
-    ledger = load_document(args.ledger)
-    args.output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
     report = []
-
     for question in ledger["questions"]:
         revisions = {revision["id"]: revision for revision in question["revisions"]}
         for forecast in question["forecasts"]:
@@ -35,7 +30,7 @@ def main() -> int:
             else:
                 envelope = sealed_forecast_envelope(question["id"], forecast, revision)
             data = canonicalize(envelope)
-            path = args.output / f"{forecast['id']}.json"
+            path = output / f"{forecast['id']}.json"
             path.write_bytes(data)
             report.append(
                 {
@@ -45,7 +40,17 @@ def main() -> int:
                     "digest": sha256_ref(data),
                 }
             )
+    return report
 
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("ledger", type=Path)
+    parser.add_argument("--output", type=Path, default=Path("proofs/targets"))
+    args = parser.parse_args()
+
+    ledger = load_document(args.ledger)
+    report = build_targets(ledger, args.output)
     print(json.dumps(report, indent=2))
     return 0
 
