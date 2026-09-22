@@ -1,10 +1,10 @@
 # Cryptographic verification
 
-This document is normative for `forecast-envelope/v2`, `forecast-lifecycle/v1`,
-and `forecast-seal/v2`.
+This document is normative for `forecast-envelope/v3`, `forecast-lifecycle/v2`,
+`forecast-seal/v3`, and `forecast-key/v3`.
 The executable reference is
-[`tools/forecast_crypto.py`](../tools/forecast_crypto.py). The same module keeps
-the frozen v1 algorithm solely to verify historical `forecast-seal/v1` vectors.
+[`tools/forecast_crypto.py`](../tools/forecast_crypto.py). It contains no legacy
+seal, key, envelope, or lifecycle parser.
 
 ## Security claims and non-claims
 
@@ -36,7 +36,7 @@ Probabilities and numeric values are strings. The reference implementation uses
 UTF-16 property ordering as required by RFC 8785 and outputs UTF-8 without a
 trailing newline.
 
-## `forecast-envelope/v2`
+## `forecast-envelope/v3`
 
 The envelope is the exact object sent to RFC 8785 canonicalization and then
 SHA-256. It includes the full bound revision, not only its ID.
@@ -45,7 +45,7 @@ SHA-256. It includes the full bound revision, not only its ID.
 
 ```json
 {
-  "schema": "forecast-envelope/v2",
+  "schema": "forecast-envelope/v3",
   "question": {
     "id": "q-example",
     "revision": {
@@ -92,7 +92,7 @@ contains the visible IDs and times plus:
 {
   "visibility": "sealed",
   "commitment": {
-    "scheme": "forecast-seal/v2",
+    "scheme": "forecast-seal/v3",
     "commitment_hash": {"algorithm": "sha-256", "value": "..."},
     "encryption": {
       "algorithm": "chacha20-poly1305",
@@ -110,7 +110,7 @@ so rebuilding a revealed forecast produces the original sealed target.
 activity-metadata reason; the original sealed target remains byte-for-byte
 reproducible after either is appended.
 
-## `forecast-lifecycle/v1`
+## `forecast-lifecycle/v2`
 
 A lifecycle checkpoint covers one complete ordered event prefix. Construct this
 closed object, canonicalize it with RFC 8785, and hash the exact bytes with
@@ -118,7 +118,7 @@ SHA-256:
 
 ```json
 {
-  "schema": "forecast-lifecycle/v1",
+  "schema": "forecast-lifecycle/v2",
   "question_id": "q-example",
   "forecast_id": "f-example-1",
   "forecast_envelope_sha256": {
@@ -131,7 +131,7 @@ SHA-256:
 ```
 
 The envelope digest is computed from the corresponding public or sealed
-`forecast-envelope/v2`. Checkpoint objects, integrity records, timestamp
+`forecast-envelope/v3`. Checkpoint objects, integrity records, timestamp
 metadata, and events after the head are never included. Timestamp the lifecycle
 target through the same RFC 3161 procedure used for an envelope target.
 
@@ -145,7 +145,7 @@ another forecast within its prefix. No protocol can prove a deleted event once
 every event record, checkpoint, target artifact, evidence package, and external
 copy has also been deleted.
 
-## `forecast-seal/v2`
+## `forecast-seal/v3`
 
 ### Inputs
 
@@ -179,7 +179,7 @@ Construct this object and canonicalize it:
 
 ```json
 {
-  "schema": "forecast-seal/v2",
+  "schema": "forecast-seal/v3",
   "question_id": "q-example",
   "question_revision_id": "qr-example-1",
   "forecast_id": "f-example-1",
@@ -202,7 +202,7 @@ Construct and canonicalize:
 
 ```json
 {
-  "scheme": "forecast-seal/v2",
+  "scheme": "forecast-seal/v3",
   "question_id": "q-example",
   "question_revision_id": "qr-example-1",
   "forecast_id": "f-example-1",
@@ -212,7 +212,7 @@ Construct and canonicalize:
 
 The question revision ID is repeated in the payload and associated data. A
 mismatch is always an error. Visible forecast times are independently bound by
-the timestamped `forecast-envelope/v2`.
+the timestamped `forecast-envelope/v3`.
 
 ### Step 4: encryption
 
@@ -221,9 +221,30 @@ Encrypt the canonical plaintext using ChaCha20-Poly1305 with the 32-byte key,
 algorithm, standard base64 nonce/ciphertext, and `key_hint`. Keep the key and
 plaintext secret.
 
+### Protected `forecast-key/v3` file
+
+Store the key in this exact closed object:
+
+```json
+{
+  "schema": "forecast-key/v3",
+  "question_id": "q-example",
+  "question_revision_id": "qr-example-1",
+  "forecast_id": "f-example-1",
+  "commitment_sha256": "64 lowercase hexadecimal characters",
+  "key_hex": "64 lowercase hexadecimal characters"
+}
+```
+
+The file bytes are the RFC 8785 serialization followed by exactly one LF. The
+LF is part of the file SHA-256 vector. Unknown properties, missing bindings,
+noncanonical bytes, any other trailing data, and `forecast-key/v2` are invalid.
+The key file is protected input: it is never placed in an evidence index or
+publication package and its path is never public output.
+
 ### Step 5: external timestamp
 
-Create the full sealed `forecast-envelope/v2`, canonicalize it, compute its
+Create the full sealed `forecast-envelope/v3`, canonicalize it, compute its
 SHA-256 digest, and request RFC 3161 timestamps for those exact bytes. Do not
 timestamp ciphertext alone.
 
@@ -237,7 +258,7 @@ order:
 2. reconstruct associated data from ledger IDs and the commitment hash;
 3. authenticate and decrypt ChaCha20-Poly1305;
 4. compute SHA-256 over the decrypted bytes and compare it to the commitment;
-5. parse JSON and require `schema: forecast-seal/v2`;
+5. parse JSON and require `schema: forecast-seal/v3`;
 6. compare question, revision, and forecast IDs;
 7. recanonicalize and require byte-for-byte equality with decrypted bytes;
 8. require `representations` and compare it with the decrypted bundle;
@@ -246,8 +267,14 @@ order:
 10. rebuild the sealed envelope and compare it with the timestamped target;
 11. independently verify at least one RFC 3161 response.
 
-Failure at any step invalidates the reveal or timing claim; do not continue and
-report a generic success.
+Failure at any step invalidates the reveal or timing claim. Stable public stage
+codes are `reveal.commitment_malformed`, `reveal.nonce_encoding_invalid`,
+`reveal.ciphertext_encoding_invalid`, `reveal.algorithm_unsupported`,
+`reveal.key_file_invalid`, `reveal.key_file_binding_failed`,
+`reveal.authentication_failed`, `reveal.commitment_digest_mismatch`, and
+`reveal.bundle_profile_mismatch`. The last code covers every authenticated
+closed-plaintext mismatch without disclosing a field, value, parser message,
+key, salt, plaintext, credential, ciphertext excerpt, or protected path.
 
 ## RFC 3161 timestamp procedure
 
@@ -333,16 +360,18 @@ OpenSSL checks above.
 Verify seal and target vectors:
 
 ```bash
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
-python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
-python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
+python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v3.json
+python tools/forecast_crypto.py verify-key-vector tests/vectors/forecast-key-v3.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-public-lifecycle.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-sealed-lifecycle.json
+python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v2.json
+python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v3-presence.json
+python tools/sidecar_contracts.py tests/vectors/forecast-evidence-index-v1*.json tests/vectors/forecast-ledger-publication-v3*.json
 python tools/run_target_tests.py
 python tools/run_seal_tests.py
+python tools/run_sidecar_tests.py
+python tools/run_transition_tests.py
 python tools/run_diagnostic_tests.py
-python tools/verify_legacy.py
 ```
 
 The v2 seal and presence vectors fix every seal input, including salt, key, and
@@ -353,8 +382,8 @@ exact withdrawal and reaffirmation prefixes and deterministic candidates for
 prefix alteration, event deletion, reordered events, and wrong forecast
 binding. Reference builders reproduce every published byte string and digest.
 
-Frozen v1.3.0, v2.0.0, and v2.0.1 artifacts must remain byte-for-byte equal to
-their tagged files. `verify_legacy.py` enforces their SHA-256 manifests.
+Earlier releases remain byte-for-byte identified by their immutable tags. The
+v2.2.0 reference tools contain no parser or positive vector corpus for them.
 
 ## External references
 

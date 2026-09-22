@@ -11,19 +11,22 @@ ledgers and questions without forecasts are valid first-class states.
 
 ## Current contract
 
-- Forecast Ledger: `2.1.0`
+- Forecast Ledger: `2.2.0`
 - JSON Schema: Draft 2020-12
 - Canonicalization: RFC 8785 JCS, restricted to I-JSON without floats
-- Sealed forecasts: `forecast-seal/v2`
-- Timestamp target: `forecast-envelope/v2`
-- Lifecycle target: `forecast-lifecycle/v1`
+- Sealed forecasts: `forecast-seal/v3`
+- Protected key file: `forecast-key/v3`
+- Timestamp target: `forecast-envelope/v3`
+- Lifecycle target: `forecast-lifecycle/v2`
+- Evidence index: `forecast-evidence-index/v1`
+- Publication manifest: `forecast-ledger-publication/v3`
 - External timestamp protocol: RFC 3161 with SHA-256
 - Permanent schema ID:
-  `https://raw.githubusercontent.com/chaoscondensate/schema/v2.1.0/schema/forecast-ledger.schema.json`
+  `https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json`
 
-The v1.3.0 schema and cryptographic vector remain frozen at the immutable
-`v1.3.0` tag. v2 is intentionally incompatible with v1 and has no implicit
-conversion. See [v1 to v2 compatibility](docs/compatibility-v1-v2.md).
+This runtime contract accepts only v2.2.0 and its named profiles. Historical
+material remains attributable through its immutable tag and historical tools;
+v2.2.0 has no converter, dual parser, compatibility bundle, or fallback.
 
 ## What v2 records
 
@@ -85,26 +88,28 @@ transitions, artifact digests, chronology, and sealed reveal consistency.
 Run the complete conformance suite:
 
 ```bash
-check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
+check-jsonschema --check-metaschema schema/*.schema.json
 python tools/run_fixture_tests.py
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
-python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
-python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
+python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v3.json
+python tools/forecast_crypto.py verify-key-vector tests/vectors/forecast-key-v3.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-public-lifecycle.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-sealed-lifecycle.json
+python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v2.json
+python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v3-presence.json
+python tools/sidecar_contracts.py tests/vectors/forecast-evidence-index-v1*.json tests/vectors/forecast-ledger-publication-v3*.json
 python tools/run_target_tests.py
 python tools/run_seal_tests.py
+python tools/run_sidecar_tests.py
+python tools/run_transition_tests.py
 python tools/run_diagnostic_tests.py
-python tools/verify_legacy.py
 ruff check tools
 ```
 
 ## Minimal ledger
 
 ```yaml
-$schema: https://raw.githubusercontent.com/chaoscondensate/schema/v2.1.0/schema/forecast-ledger.schema.json
-schema_version: 2.1.0
+$schema: https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json
+schema_version: 2.2.0
 ledger_id: example-forecaster
 created_at: "2026-09-21T10:00:00Z"
 default_timezone: UTC
@@ -202,7 +207,7 @@ history, not trusted timestamps or forecast signatures.
 
 ## Sealed forecasts
 
-`forecast-seal/v2` encrypts the exact representations and private reasoning
+`forecast-seal/v3` encrypts the exact representations and private reasoning
 with ChaCha20-Poly1305. Its commitment and associated data bind the question ID,
 question revision ID, and forecast ID. The timestamp envelope includes the full
 question revision, so a later reveal cannot be transplanted onto different
@@ -212,34 +217,37 @@ Lifecycle events are append-only activity metadata. They change derived active
 state but are excluded from both public and sealed immutable timestamp targets,
 so withdrawal, expiry, and reaffirmation do not invalidate existing evidence.
 Optional activity checkpoints bind an ordered lifecycle prefix to the original
-forecast-envelope digest under `forecast-lifecycle/v1`. Later events leave an
+forecast-envelope digest under `forecast-lifecycle/v2`. Later events leave an
 earlier checkpoint valid and make its coverage partial until a new checkpoint
 is retained and timestamped.
 
-The `forecast-seal/v2` private bundle requires only non-empty
+The `forecast-seal/v3` private bundle requires only non-empty
 `representations`. `rationale`, `key_factors`, and `comment` are independently
 optional. Their absence is authenticated and differs from an explicitly empty
 string or empty array; reveal tooling never invents missing fields.
 
-At reveal, publish the key and exact plaintext mirror while retaining the
-original ciphertext. The semantic validator decrypts the bundle and rejects any
-mismatch. Read the normative
+The protected `forecast-key/v3` file binds the question, revision, forecast, and
+commitment digest. It is exact canonical JSON followed by one LF and is never a
+publication artifact. At reveal, retain the original ciphertext and publish the
+revealed key only inside the ledger commitment. The semantic validator decrypts
+the bundle and rejects any mismatch. Read the normative
 [cryptographic verification specification](docs/cryptographic-verification.md)
-and the [ordered operational workflows](docs/forecast-verification-workflows.md).
+the [ordered operational workflows](docs/forecast-verification-workflows.md),
+and the normative [evidence and publication contract](docs/evidence-and-publication.md).
 
 ## Repository layout
 
 ```text
-schema/                    v2 JSON Schema contract
+schema/                    Ledger, key, evidence-index, and publication schemas
 examples/valid/            English JSON and YAML examples
 tests/conformance/         Positive conformance fixtures
 tests/invalid-cases.json   Mutation-based rejection cases
-tests/vectors/             Seal, target, and frozen-release vectors
+tests/vectors/             Seal, key, target, sidecar, and publication vectors
 tools/validate.py          Structural and semantic validator
 tools/build_targets.py     RFC 8785 timestamp-target generator
 tools/forecast_crypto.py   Seal, reveal, and canonicalization reference
+tools/sidecar_contracts.py Evidence-index and publication reference
 tools/run_target_tests.py  Envelope projection conformance tests
-tools/verify_legacy.py     Byte-for-byte released-artifact freeze checks
 docs/                      Data model, compatibility, and workflows
 research/                  Scope research supporting the v2 decision
 ```
@@ -247,17 +255,15 @@ research/                  Scope research supporting the v2 decision
 ## Versioning and publication
 
 Release tags are immutable public contracts. A schema `$id` always points to a
-tag, never a moving branch. `v2.1.0` is an explicitly breaking pre-adoption v2
-cutover. It adds `forecast-lifecycle/v1`, lifecycle checkpoints and chronology
-rules, and redefines the closed `forecast-seal/v2` private bundle so only
-`representations` is required. Compatibility and conversion are deliberately
-out of scope. Frozen older tags remain the exact sources for evidence created
-under their releases.
+tag, never a moving branch. `v2.2.0` is an explicitly breaking pre-adoption
+cutover. It assigns new identities to every changed byte profile, adds retained
+target states and closed evidence/publication sidecars, and accepts no earlier
+contract or profile. Compatibility and conversion are deliberately out of
+scope. Frozen older tags remain the exact sources for historical evidence.
 
-The release workflow validates seal-presence, envelope, lifecycle, diagnostic,
-and conformance vectors; proves that tagged v1.3.0, v2.0.0, and v2.0.1 artifacts
-still match their frozen SHA-256 manifests; and publishes a deterministic source
-archive plus `SHA256SUMS` as GitHub Release assets.
+The release workflow validates schema, seal, key, envelope, lifecycle, sidecar,
+diagnostic, and conformance vectors and publishes a deterministic source archive,
+standalone schemas, examples, and `SHA256SUMS` as GitHub Release assets.
 
 ## License and contributions
 

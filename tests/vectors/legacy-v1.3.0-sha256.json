@@ -1,7 +1,0 @@
-{
-  "tag": "v1.3.0",
-  "files": {
-    "schema/forecast-ledger.schema.json": "f673e4f3fc867a83d8c42a6992c6020ea28359a293580c8c742fe9dcdcd8d2c1",
-    "tests/vectors/forecast-seal-v1.json": "59f3996b22e135d5c2d1a6977c2e5dfa025d3f2ececd226b6fb4096ddc7272f5"
-  }
-}

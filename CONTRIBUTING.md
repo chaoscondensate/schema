@@ -29,24 +29,26 @@ An explicitly commissioned pre-adoption v2 cutover may instead use a minor
 release when compatibility and conversion are deliberately out of scope. The
 release notes must identify every breaking contract and protocol change, freeze
 all earlier tags, publish complete replacement vectors, and state that clients
-must import the new exact release as one unit. `v2.1.0` uses this narrow rule.
+must import the new exact release as one unit. `v2.2.0` uses this narrow rule.
 
 ## Development checks
 
 ```bash
 python -m pip install -r requirements-dev.txt
-check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
+check-jsonschema --check-metaschema schema/*.schema.json
 python tools/run_fixture_tests.py
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
-python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
-python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
-python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
-python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
+python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v3.json
+python tools/forecast_crypto.py verify-key-vector tests/vectors/forecast-key-v3.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-public-lifecycle.json
+python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-sealed-lifecycle.json
+python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v2.json
+python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v3-presence.json
+python tools/sidecar_contracts.py tests/vectors/forecast-evidence-index-v1*.json tests/vectors/forecast-ledger-publication-v3*.json
 python tools/run_target_tests.py
 python tools/run_seal_tests.py
+python tools/run_sidecar_tests.py
+python tools/run_transition_tests.py
 python tools/run_diagnostic_tests.py
-python tools/verify_legacy.py
 ruff check tools
 ```
 

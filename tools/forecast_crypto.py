@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Reference cryptographic operations for Forecast Ledger seal profiles v1 and v2.
+"""Reference cryptographic operations for Forecast Ledger v2.2.0.
 
 The implementation supports the RFC 8785 subset used by this project: strings,
 booleans, null, arrays, objects, and I-JSON safe integers. Floating-point JSON
-numbers are rejected; exact values and probabilities are decimal strings in v2.
+numbers are rejected; exact values and probabilities are decimal strings.
 """
 
 from __future__ import annotations
@@ -16,29 +16,32 @@ import json
 from pathlib import Path
 from typing import Any
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
-SEAL_SCHEME_V1 = "forecast-seal/v1"
-SEAL_SCHEME_V2 = "forecast-seal/v2"
-ENVELOPE_SCHEMA_V1 = "forecast-envelope/v1"
-ENVELOPE_SCHEMA_V2 = "forecast-envelope/v2"
-LIFECYCLE_SCHEMA_V1 = "forecast-lifecycle/v1"
+SEAL_SCHEME_V3 = "forecast-seal/v3"
+KEY_SCHEMA_V3 = "forecast-key/v3"
+ENVELOPE_SCHEMA_V3 = "forecast-envelope/v3"
+LIFECYCLE_SCHEMA_V2 = "forecast-lifecycle/v2"
 
-PRIVATE_BUNDLE_V2_FIELDS = {
+PRIVATE_BUNDLE_V3_FIELDS = {
     "representations",
     "rationale",
     "key_factors",
     "comment",
 }
 
-# Backward-compatible aliases for applications importing the original names.
-SEAL_SCHEME = SEAL_SCHEME_V1
-ENVELOPE_SCHEMA = ENVELOPE_SCHEMA_V1
-
-
 class CanonicalizationError(ValueError):
     """Raised when a value is outside the project's RFC 8785 subset."""
+
+
+class RevealError(ValueError):
+    """A stable secret-safe reveal failure."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 def _reject_surrogates(value: str) -> None:
@@ -93,6 +96,75 @@ def sha256_ref(data: bytes) -> dict[str, str]:
     return {"algorithm": "sha-256", "value": hashlib.sha256(data).hexdigest()}
 
 
+def encode_key_file(
+    *,
+    question_id: str,
+    question_revision_id: str,
+    forecast_id: str,
+    commitment_sha256: str,
+    key: bytes,
+) -> bytes:
+    """Encode the exact closed forecast-key/v3 file including its final LF."""
+
+    if len(key) != 32:
+        raise ValueError("key must be exactly 32 bytes")
+    value = {
+        "schema": KEY_SCHEMA_V3,
+        "question_id": question_id,
+        "question_revision_id": question_revision_id,
+        "forecast_id": forecast_id,
+        "commitment_sha256": commitment_sha256,
+        "key_hex": key.hex(),
+    }
+    return canonicalize(value) + b"\n"
+
+
+def decode_key_file(
+    data: bytes,
+    *,
+    question_id: str,
+    question_revision_id: str,
+    forecast_id: str,
+    commitment_sha256: str,
+) -> bytes:
+    """Decode and bind one exact forecast-key/v3 file without legacy fallback."""
+
+    if not data or len(data) > 4096 or not data.endswith(b"\n") or b"\n" in data[:-1]:
+        raise RevealError("reveal.key_file_invalid")
+    payload_bytes = data[:-1]
+    try:
+        value = json.loads(payload_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise RevealError("reveal.key_file_invalid") from None
+    expected_fields = {
+        "schema",
+        "question_id",
+        "question_revision_id",
+        "forecast_id",
+        "commitment_sha256",
+        "key_hex",
+    }
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        raise RevealError("reveal.key_file_invalid")
+    try:
+        canonical = canonicalize(value)
+        key = bytes.fromhex(value["key_hex"])
+    except (CanonicalizationError, TypeError, ValueError):
+        raise RevealError("reveal.key_file_invalid") from None
+    if canonical != payload_bytes or len(key) != 32 or value["key_hex"] != key.hex():
+        raise RevealError("reveal.key_file_invalid")
+    bindings = (
+        value["schema"] == KEY_SCHEMA_V3,
+        value["question_id"] == question_id,
+        value["question_revision_id"] == question_revision_id,
+        value["forecast_id"] == forecast_id,
+        value["commitment_sha256"] == commitment_sha256,
+    )
+    if not all(bindings):
+        raise RevealError("reveal.key_file_binding_failed")
+    return key
+
+
 def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
@@ -101,18 +173,7 @@ def _unb64(value: str) -> bytes:
     return base64.b64decode(value, validate=True)
 
 
-def _aad_v1(question_id: str, forecast_id: str, commitment_hex: str) -> bytes:
-    return canonicalize(
-        {
-            "scheme": SEAL_SCHEME_V1,
-            "question_id": question_id,
-            "forecast_id": forecast_id,
-            "commitment_sha256": commitment_hex,
-        }
-    )
-
-
-def _aad_v2(
+def _aad_v3(
     question_id: str,
     question_revision_id: str,
     forecast_id: str,
@@ -120,7 +181,7 @@ def _aad_v2(
 ) -> bytes:
     return canonicalize(
         {
-            "scheme": SEAL_SCHEME_V2,
+            "scheme": SEAL_SCHEME_V3,
             "question_id": question_id,
             "question_revision_id": question_revision_id,
             "forecast_id": forecast_id,
@@ -138,8 +199,8 @@ def seal_forecast(
     key: bytes,
     nonce: bytes,
     key_hint: str,
-    scheme: str = SEAL_SCHEME_V1,
-    question_revision_id: str | None = None,
+    scheme: str = SEAL_SCHEME_V3,
+    question_revision_id: str,
 ) -> tuple[dict[str, Any], bytes]:
     """Seal a private forecast and return its public commitment plus plaintext."""
 
@@ -149,46 +210,23 @@ def seal_forecast(
         raise ValueError("key must be exactly 32 bytes")
     if len(nonce) != 12:
         raise ValueError("nonce must be exactly 12 bytes")
-    if scheme not in {SEAL_SCHEME_V1, SEAL_SCHEME_V2}:
+    if scheme != SEAL_SCHEME_V3:
         raise ValueError(f"unsupported seal scheme: {scheme}")
-
-    if scheme == SEAL_SCHEME_V2:
-        if question_revision_id is None:
-            raise ValueError("question_revision_id is required for forecast-seal/v2")
-        _validate_private_bundle_v2(bundle)
-    else:
-        required_bundle_fields = {
-            "forecasted_at",
-            "recorded_at",
-            "value",
-            "rationale",
-            "key_factors",
-            "comment",
-        }
-        missing = sorted(required_bundle_fields - bundle.keys())
-        if missing:
-            raise ValueError(f"sealed bundle is missing: {', '.join(missing)}")
+    if not question_revision_id:
+        raise ValueError("question_revision_id is required for forecast-seal/v3")
+    _validate_private_bundle_v3(bundle)
 
     payload = {
         "schema": scheme,
         "question_id": question_id,
+        "question_revision_id": question_revision_id,
         "forecast_id": forecast_id,
         "bundle": bundle,
         "salt": salt.hex(),
     }
-    if scheme == SEAL_SCHEME_V2:
-        payload["question_revision_id"] = question_revision_id
     plaintext = canonicalize(payload)
     commitment = sha256_ref(plaintext)
-    if scheme == SEAL_SCHEME_V1:
-        aad = _aad_v1(question_id, forecast_id, commitment["value"])
-    else:
-        aad = _aad_v2(
-            question_id,
-            str(question_revision_id),
-            forecast_id,
-            commitment["value"],
-        )
+    aad = _aad_v3(question_id, question_revision_id, forecast_id, commitment["value"])
     ciphertext = ChaCha20Poly1305(key).encrypt(nonce, plaintext, aad)
 
     public_commitment = {
@@ -210,48 +248,75 @@ def reveal_forecast(
     forecast_id: str,
     commitment: dict[str, Any],
     key: bytes,
-    question_revision_id: str | None = None,
+    question_revision_id: str,
 ) -> dict[str, Any]:
-    """Decrypt, authenticate, and verify a v1 or v2 sealed forecast payload."""
+    """Decrypt, authenticate, and verify one forecast-seal/v3 payload."""
 
     if len(key) != 32:
-        raise ValueError("key must be exactly 32 bytes")
-    scheme = commitment["scheme"]
-    commitment_hex = commitment["commitment_hash"]["value"]
-    encryption = commitment["encryption"]
-    nonce = _unb64(encryption["nonce"])
-    ciphertext = _unb64(encryption["ciphertext"])
-    if scheme == SEAL_SCHEME_V1:
-        aad = _aad_v1(question_id, forecast_id, commitment_hex)
-    elif scheme == SEAL_SCHEME_V2:
-        if question_revision_id is None:
-            raise ValueError("question_revision_id is required for forecast-seal/v2")
-        aad = _aad_v2(question_id, question_revision_id, forecast_id, commitment_hex)
-    else:
-        raise ValueError(f"unsupported seal scheme: {scheme}")
-    plaintext = ChaCha20Poly1305(key).decrypt(nonce, ciphertext, aad)
+        raise RevealError("reveal.key_file_invalid")
+    try:
+        scheme = commitment["scheme"]
+        commitment_hash = commitment["commitment_hash"]
+        commitment_hex = commitment_hash["value"]
+        encryption = commitment["encryption"]
+        nonce_text = encryption["nonce"]
+        ciphertext_text = encryption["ciphertext"]
+    except (KeyError, TypeError):
+        raise RevealError("reveal.commitment_malformed") from None
+    if (
+        scheme != SEAL_SCHEME_V3
+        or commitment_hash.get("algorithm") != "sha-256"
+        or encryption.get("algorithm") != "chacha20-poly1305"
+    ):
+        raise RevealError("reveal.algorithm_unsupported")
+    try:
+        nonce = _unb64(nonce_text)
+    except (TypeError, ValueError):
+        raise RevealError("reveal.nonce_encoding_invalid") from None
+    if len(nonce) != 12:
+        raise RevealError("reveal.nonce_encoding_invalid")
+    try:
+        ciphertext = _unb64(ciphertext_text)
+    except (TypeError, ValueError):
+        raise RevealError("reveal.ciphertext_encoding_invalid") from None
+    if len(ciphertext) < 16:
+        raise RevealError("reveal.ciphertext_encoding_invalid")
+    aad = _aad_v3(question_id, question_revision_id, forecast_id, commitment_hex)
+    try:
+        plaintext = ChaCha20Poly1305(key).decrypt(nonce, ciphertext, aad)
+    except InvalidTag:
+        raise RevealError("reveal.authentication_failed") from None
 
     actual = hashlib.sha256(plaintext).hexdigest()
     if actual != commitment_hex:
-        raise ValueError("decrypted payload does not match the commitment hash")
-    payload = json.loads(plaintext)
-    expected_payload_fields = {"schema", "question_id", "forecast_id", "bundle", "salt"}
-    if scheme == SEAL_SCHEME_V2:
-        expected_payload_fields.add("question_revision_id")
-    if set(payload) != expected_payload_fields:
-        raise ValueError("sealed payload contains unknown or missing properties")
-    if payload.get("schema") != scheme:
-        raise ValueError("unexpected sealed payload scheme")
-    if payload.get("question_id") != question_id:
-        raise ValueError("sealed payload belongs to another question")
-    if payload.get("forecast_id") != forecast_id:
-        raise ValueError("sealed payload belongs to another forecast")
-    if scheme == SEAL_SCHEME_V2:
-        if payload.get("question_revision_id") != question_revision_id:
-            raise ValueError("sealed payload belongs to another question revision")
-        _validate_private_bundle_v2(payload.get("bundle"))
-    if canonicalize(payload) != plaintext:
-        raise ValueError("decrypted payload is not canonical RFC 8785 data")
+        raise RevealError("reveal.commitment_digest_mismatch")
+    try:
+        payload = json.loads(plaintext)
+        expected_payload_fields = {
+            "schema",
+            "question_id",
+            "question_revision_id",
+            "forecast_id",
+            "bundle",
+            "salt",
+        }
+        salt = bytes.fromhex(payload["salt"])
+        profile_matches = (
+            isinstance(payload, dict)
+            and set(payload) == expected_payload_fields
+            and payload.get("schema") == SEAL_SCHEME_V3
+            and payload.get("question_id") == question_id
+            and payload.get("question_revision_id") == question_revision_id
+            and payload.get("forecast_id") == forecast_id
+            and len(salt) == 32
+            and payload["salt"] == salt.hex()
+            and canonicalize(payload) == plaintext
+        )
+        _validate_private_bundle_v3(payload.get("bundle"))
+    except (CanonicalizationError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise RevealError("reveal.bundle_profile_mismatch") from None
+    if not profile_matches:
+        raise RevealError("reveal.bundle_profile_mismatch")
     return payload
 
 
@@ -263,8 +328,8 @@ def reveal_into_forecast(
     """Return a revealed forecast containing exactly the authenticated private fields."""
 
     bundle = payload["bundle"]
-    _validate_private_bundle_v2(bundle)
-    if payload.get("schema") != SEAL_SCHEME_V2:
+    _validate_private_bundle_v3(bundle)
+    if payload.get("schema") != SEAL_SCHEME_V3:
         raise ValueError("unexpected sealed payload scheme")
     if payload.get("forecast_id") != forecast.get("id"):
         raise ValueError("sealed payload belongs to another forecast")
@@ -278,9 +343,9 @@ def reveal_into_forecast(
     ):
         raise ValueError("revealed commitment does not retain the original seal")
     result = copy.deepcopy(forecast)
-    for field in PRIVATE_BUNDLE_V2_FIELDS:
+    for field in PRIVATE_BUNDLE_V3_FIELDS:
         result.pop(field, None)
-    for field in PRIVATE_BUNDLE_V2_FIELDS:
+    for field in PRIVATE_BUNDLE_V3_FIELDS:
         if field in bundle:
             result[field] = copy.deepcopy(bundle[field])
     result["visibility"] = "revealed"
@@ -288,12 +353,12 @@ def reveal_into_forecast(
     return result
 
 
-def _validate_private_bundle_v2(bundle: Any) -> None:
-    """Validate the closed forecast-seal/v2 private bundle without exposing values."""
+def _validate_private_bundle_v3(bundle: Any) -> None:
+    """Validate the closed forecast-seal/v3 private bundle without exposing values."""
 
     if not isinstance(bundle, dict):
         raise ValueError("sealed bundle must be an object")
-    unknown = sorted(set(bundle) - PRIVATE_BUNDLE_V2_FIELDS)
+    unknown = sorted(set(bundle) - PRIVATE_BUNDLE_V3_FIELDS)
     if unknown:
         raise ValueError(f"sealed bundle contains unknown properties: {', '.join(unknown)}")
     if "representations" not in bundle:
@@ -363,20 +428,14 @@ def _included_forecast(forecast: dict[str, Any], *, sealed: bool) -> dict[str, A
 def public_forecast_envelope(
     question_id: str,
     forecast: dict[str, Any],
-    question_revision: dict[str, Any] | None = None,
+    question_revision: dict[str, Any],
 ) -> dict[str, Any]:
     """Build the immutable timestamp target for a public forecast."""
 
-    if question_revision is None:
-        return {
-            "schema": ENVELOPE_SCHEMA_V1,
-            "question_id": question_id,
-            "forecast": _included_forecast(forecast, sealed=False),
-        }
     if forecast.get("question_revision_id") != question_revision.get("id"):
         raise ValueError("forecast does not reference the supplied question revision")
     return {
-        "schema": ENVELOPE_SCHEMA_V2,
+        "schema": ENVELOPE_SCHEMA_V3,
         "question": {"id": question_id, "revision": question_revision},
         "forecast": _included_forecast(forecast, sealed=False),
     }
@@ -385,20 +444,14 @@ def public_forecast_envelope(
 def sealed_forecast_envelope(
     question_id: str,
     forecast: dict[str, Any],
-    question_revision: dict[str, Any] | None = None,
+    question_revision: dict[str, Any],
 ) -> dict[str, Any]:
     """Build the immutable target that binds every security-relevant seal input."""
 
-    if question_revision is None:
-        return {
-            "schema": ENVELOPE_SCHEMA_V1,
-            "question_id": question_id,
-            "forecast": _included_forecast(forecast, sealed=True),
-        }
     if forecast.get("question_revision_id") != question_revision.get("id"):
         raise ValueError("forecast does not reference the supplied question revision")
     return {
-        "schema": ENVELOPE_SCHEMA_V2,
+        "schema": ENVELOPE_SCHEMA_V3,
         "question": {"id": question_id, "revision": question_revision},
         "forecast": _included_forecast(forecast, sealed=True),
     }
@@ -433,7 +486,7 @@ def forecast_lifecycle_target(
         raise ValueError("covered lifecycle head does not exist")
     envelope_bytes = canonicalize(forecast_envelope(question_id, forecast, question_revision))
     return {
-        "schema": LIFECYCLE_SCHEMA_V1,
+        "schema": LIFECYCLE_SCHEMA_V2,
         "question_id": question_id,
         "forecast_id": forecast["id"],
         "forecast_envelope_sha256": sha256_ref(envelope_bytes),
@@ -443,10 +496,10 @@ def forecast_lifecycle_target(
 
 
 def verify_vector(vector: dict[str, Any]) -> None:
+    if vector.get("schema") != "forecast-seal-test-vector/v3":
+        raise AssertionError("unsupported seal vector profile")
     material = vector["material"]
-    vector_schema = vector.get("schema", "forecast-seal-test-vector/v1")
-    scheme = SEAL_SCHEME_V2 if vector_schema.endswith("/v2") else SEAL_SCHEME_V1
-    revision_id = vector.get("question_revision_id")
+    revision_id = vector["question_revision_id"]
     commitment, plaintext = seal_forecast(
         question_id=vector["question_id"],
         question_revision_id=revision_id,
@@ -456,7 +509,7 @@ def verify_vector(vector: dict[str, Any]) -> None:
         key=bytes.fromhex(material["key_hex"]),
         nonce=bytes.fromhex(material["nonce_hex"]),
         key_hint=vector["expected"]["commitment"]["key_hint"],
-        scheme=scheme,
+        scheme=SEAL_SCHEME_V3,
     )
     if plaintext.decode("utf-8") != vector["expected"]["canonical_plaintext"]:
         raise AssertionError("canonical plaintext differs from the test vector")
@@ -491,6 +544,8 @@ def envelope_from_target_vector(vector: dict[str, Any]) -> dict[str, Any]:
 def verify_target_vector(vector: dict[str, Any]) -> bytes:
     """Verify exact canonical bytes and SHA-256 for an envelope target vector."""
 
+    if vector.get("schema") != "forecast-envelope-test-vector/v3":
+        raise AssertionError("unsupported envelope vector profile")
     data = canonicalize(envelope_from_target_vector(vector))
     if data.decode("utf-8") != vector["expected"]["canonical_envelope"]:
         raise AssertionError("canonical envelope differs from the target vector")
@@ -505,6 +560,8 @@ def verify_target_vector(vector: dict[str, Any]) -> bytes:
 def verify_lifecycle_vector(vector: dict[str, Any]) -> None:
     """Verify exact lifecycle targets and deterministic tamper candidates."""
 
+    if vector.get("schema") != "forecast-lifecycle-test-vector/v2":
+        raise AssertionError("unsupported lifecycle vector profile")
     expected_by_name: dict[str, bytes] = {}
     for checkpoint in vector["checkpoints"]:
         target = forecast_lifecycle_target(
@@ -577,6 +634,8 @@ def verify_lifecycle_vector(vector: dict[str, Any]) -> None:
 def verify_presence_vector(vector: dict[str, Any]) -> None:
     """Verify exact seal vectors for every optional-field presence combination."""
 
+    if vector.get("schema") != "forecast-seal-presence-test-vector/v3":
+        raise AssertionError("unsupported seal presence vector profile")
     material = vector["material"]
     for case in vector["cases"]:
         commitment, plaintext = seal_forecast(
@@ -588,7 +647,7 @@ def verify_presence_vector(vector: dict[str, Any]) -> None:
             key=bytes.fromhex(material["key_hex"]),
             nonce=bytes.fromhex(material["nonce_hex"]),
             key_hint=vector["key_hint"],
-            scheme=SEAL_SCHEME_V2,
+            scheme=SEAL_SCHEME_V3,
         )
         if plaintext.decode("utf-8") != case["expected"]["canonical_plaintext"]:
             raise AssertionError(f"{case['name']}: canonical plaintext differs")
@@ -617,7 +676,7 @@ def verify_presence_vector(vector: dict[str, Any]) -> None:
                 key=bytes.fromhex(material["key_hex"]),
                 nonce=bytes.fromhex(material["nonce_hex"]),
                 key_hint=vector["key_hint"],
-                scheme=SEAL_SCHEME_V2,
+                scheme=SEAL_SCHEME_V3,
             )
         except ValueError as error:
             if str(error) != case["expected_error"]:
@@ -626,31 +685,14 @@ def verify_presence_vector(vector: dict[str, Any]) -> None:
             raise AssertionError(f"{case['name']}: invalid bundle was accepted")
 
 
-def _demo_vector(version: int) -> dict[str, Any]:
-    if version == 1:
-        bundle = {
-            "forecasted_at": "2026-08-25T10:00:00+01:00",
-            "recorded_at": "2026-08-25T10:01:00+01:00",
-            "value": {"kind": "binary", "probability_bp": 6500},
-            "rationale": (
-                "The base rate and two independent indicators point in the same direction."
-            ),
-            "key_factors": ["base rate", "leading indicator"],
-            "comment": "Reveal after the outcome is public.",
-        }
-        revision_id = None
-        scheme = SEAL_SCHEME_V1
-    else:
-        bundle = {
-            "representations": [{"kind": "probability", "outcome": True, "probability": "0.65"}],
-            "rationale": (
-                "The base rate and two independent indicators point in the same direction."
-            ),
-            "key_factors": ["base rate", "leading indicator"],
-            "comment": "Reveal after the outcome is public.",
-        }
-        revision_id = "qr-example-binary-1"
-        scheme = SEAL_SCHEME_V2
+def _demo_vector() -> dict[str, Any]:
+    bundle = {
+        "representations": [{"kind": "probability", "outcome": True, "probability": "0.65"}],
+        "rationale": "The base rate and two independent indicators point in the same direction.",
+        "key_factors": ["base rate", "leading indicator"],
+        "comment": "Reveal after the outcome is public.",
+    }
+    revision_id = "qr-example-binary-1"
     salt = bytes.fromhex("aa" * 10 + "1f" + "aa" * 21)
     key = bytes.fromhex("bb" * 32)
     nonce = bytes.fromhex("cc" * 12)
@@ -663,11 +705,12 @@ def _demo_vector(version: int) -> dict[str, Any]:
         key=key,
         nonce=nonce,
         key_hint="secret-manager://forecast-ledger/f-example-binary-001",
-        scheme=scheme,
+        scheme=SEAL_SCHEME_V3,
     )
     vector = {
-        "schema": f"forecast-seal-test-vector/v{version}",
+        "schema": "forecast-seal-test-vector/v3",
         "question_id": "q-example-binary",
+        "question_revision_id": revision_id,
         "forecast_id": "f-example-binary-001",
         "bundle": bundle,
         "material": {
@@ -680,9 +723,57 @@ def _demo_vector(version: int) -> dict[str, Any]:
             "commitment": commitment,
         },
     }
-    if revision_id:
-        vector["question_revision_id"] = revision_id
     return vector
+
+
+def _key_demo_vector() -> dict[str, Any]:
+    seal = _demo_vector()
+    commitment_sha256 = seal["expected"]["commitment"]["commitment_hash"]["value"]
+    key = bytes.fromhex(seal["material"]["key_hex"])
+    encoded = encode_key_file(
+        question_id=seal["question_id"],
+        question_revision_id=seal["question_revision_id"],
+        forecast_id=seal["forecast_id"],
+        commitment_sha256=commitment_sha256,
+        key=key,
+    )
+    return {
+        "schema": "forecast-key-test-vector/v3",
+        "question_id": seal["question_id"],
+        "question_revision_id": seal["question_revision_id"],
+        "forecast_id": seal["forecast_id"],
+        "commitment_sha256": commitment_sha256,
+        "key_hex": key.hex(),
+        "expected": {
+            "canonical_file": encoded.decode("utf-8"),
+            "file_sha256": hashlib.sha256(encoded).hexdigest(),
+        },
+    }
+
+
+def verify_key_vector(vector: dict[str, Any]) -> None:
+    if vector.get("schema") != "forecast-key-test-vector/v3":
+        raise AssertionError("unsupported key vector profile")
+    data = encode_key_file(
+        question_id=vector["question_id"],
+        question_revision_id=vector["question_revision_id"],
+        forecast_id=vector["forecast_id"],
+        commitment_sha256=vector["commitment_sha256"],
+        key=bytes.fromhex(vector["key_hex"]),
+    )
+    if data.decode("utf-8") != vector["expected"]["canonical_file"]:
+        raise AssertionError("canonical key file differs from the test vector")
+    if hashlib.sha256(data).hexdigest() != vector["expected"]["file_sha256"]:
+        raise AssertionError("key file SHA-256 differs from the test vector")
+    decoded = decode_key_file(
+        data,
+        question_id=vector["question_id"],
+        question_revision_id=vector["question_revision_id"],
+        forecast_id=vector["forecast_id"],
+        commitment_sha256=vector["commitment_sha256"],
+    )
+    if decoded.hex() != vector["key_hex"]:
+        raise AssertionError("decoded key differs from the test vector")
 
 
 def _presence_demo_vector() -> dict[str, Any]:
@@ -721,7 +812,7 @@ def _presence_demo_vector() -> dict[str, Any]:
             salt=salt,
             key=key,
             nonce=nonce,
-            scheme=SEAL_SCHEME_V2,
+            scheme=SEAL_SCHEME_V3,
         )
         cases.append(
             {
@@ -746,7 +837,7 @@ def _presence_demo_vector() -> dict[str, Any]:
         salt=salt,
         key=key,
         nonce=nonce,
-        scheme=SEAL_SCHEME_V2,
+        scheme=SEAL_SCHEME_V3,
     )
     cases.append(
         {
@@ -760,7 +851,7 @@ def _presence_demo_vector() -> dict[str, Any]:
         }
     )
     return {
-        "schema": "forecast-seal-presence-test-vector/v1",
+        "schema": "forecast-seal-presence-test-vector/v3",
         **context,
         "material": {
             "salt_hex": salt.hex(),
@@ -889,7 +980,7 @@ def _lifecycle_demo_vector() -> dict[str, Any]:
         for name, candidate, head, checkpoint in tamper_specs
     ]
     return {
-        "schema": "forecast-lifecycle-test-vector/v1",
+        "schema": "forecast-lifecycle-test-vector/v2",
         "question_id": question_id,
         "question_revision": revision,
         "forecast": forecast,
@@ -902,12 +993,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     show_parser = subparsers.add_parser("show-vector", help="Print a deterministic vector")
-    show_parser.add_argument("--version", type=int, choices=(1, 2), default=2)
+    show_parser.add_argument("--output", type=Path)
+    key_show_parser = subparsers.add_parser(
+        "show-key-vector", help="Print a deterministic forecast-key/v3 vector"
+    )
+    key_show_parser.add_argument("--output", type=Path)
     subparsers.add_parser(
-        "show-presence-vector", help="Print deterministic forecast-seal/v2 presence vectors"
+        "show-presence-vector", help="Print deterministic forecast-seal/v3 presence vectors"
     )
     subparsers.add_parser(
-        "show-lifecycle-vector", help="Print deterministic forecast-lifecycle/v1 vectors"
+        "show-lifecycle-vector", help="Print deterministic forecast-lifecycle/v2 vectors"
     )
     verify_parser = subparsers.add_parser("verify-vector", help="Verify a vector file")
     verify_parser.add_argument("path", type=Path)
@@ -920,13 +1015,28 @@ def main() -> int:
     )
     lifecycle_parser.add_argument("path", type=Path)
     presence_parser = subparsers.add_parser(
-        "verify-presence-vector", help="Verify forecast-seal/v2 optional-field vectors"
+        "verify-presence-vector", help="Verify forecast-seal/v3 optional-field vectors"
     )
     presence_parser.add_argument("path", type=Path)
+    key_parser = subparsers.add_parser(
+        "verify-key-vector", help="Verify a forecast-key/v3 vector file"
+    )
+    key_parser.add_argument("path", type=Path)
     args = parser.parse_args()
 
     if args.command == "show-vector":
-        print(json.dumps(_demo_vector(args.version), ensure_ascii=False, indent=2))
+        rendered = json.dumps(_demo_vector(), ensure_ascii=False, indent=2) + "\n"
+        if args.output:
+            args.output.write_text(rendered, encoding="utf-8")
+        else:
+            print(rendered, end="")
+        return 0
+    if args.command == "show-key-vector":
+        rendered = json.dumps(_key_demo_vector(), ensure_ascii=False, indent=2) + "\n"
+        if args.output:
+            args.output.write_text(rendered, encoding="utf-8")
+        else:
+            print(rendered, end="")
         return 0
     if args.command == "show-presence-vector":
         print(json.dumps(_presence_demo_vector(), ensure_ascii=False, indent=2))
@@ -941,6 +1051,8 @@ def main() -> int:
         verify_lifecycle_vector(vector)
     elif args.command == "verify-presence-vector":
         verify_presence_vector(vector)
+    elif args.command == "verify-key-vector":
+        verify_key_vector(vector)
     else:
         verify_vector(vector)
     print(f"ok: {args.path}")

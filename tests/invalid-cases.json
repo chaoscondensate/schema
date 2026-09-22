@@ -385,12 +385,12 @@
         "value": {
           "status": "verified",
           "target": {
-            "scope": "forecast-envelope/v2",
+            "scope": "forecast-envelope/v3",
             "canonicalization": "RFC8785",
-            "artifact_path": "tests/vectors/forecast-seal-v1.json",
+            "artifact_path": "tests/vectors/forecast-seal-v3.json",
             "digest": {
               "algorithm": "sha-256",
-              "value": "59f3996b22e135d5c2d1a6977c2e5dfa025d3f2ececd226b6fb4096ddc7272f5"
+              "value": "247c46adca3d50e2f118157c0a6faa1a0891d81abdda6fdd1e7e88a5f9aa4399"
             }
           },
           "timestamps": [
@@ -423,7 +423,7 @@
         "value": {
           "status": "pending",
           "target": {
-            "scope": "forecast-envelope/v2",
+            "scope": "forecast-envelope/v3",
             "canonicalization": "RFC8785",
             "artifact_path": "proofs/targets/f-central-bank-cut-001.json",
             "digest": {
@@ -438,6 +438,93 @@
               "state": "pending"
             }
           ]
+        }
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/integrity"
+  },
+  {
+    "name": "superseded-schema-uri",
+    "base": "examples/valid/empty-ledger.json",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/$schema",
+        "value": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.1.0/schema/forecast-ledger.schema.json"
+      }
+    ],
+    "expect_contains": "/$schema"
+  },
+  {
+    "name": "superseded-seal-profile",
+    "base": "examples/valid/team-ledger.yaml",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/questions/0/forecasts/0/commitment/scheme",
+        "value": "forecast-seal/v2"
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/commitment"
+  },
+  {
+    "name": "superseded-envelope-profile",
+    "base": "tests/conformance/valid/retained-forecast.json",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/questions/0/forecasts/0/integrity/target/scope",
+        "value": "forecast-envelope/v2"
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/integrity"
+  },
+  {
+    "name": "superseded-lifecycle-profile",
+    "base": "tests/conformance/valid/lifecycle-checkpoints.json",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/questions/0/forecasts/0/activity_checkpoints/0/integrity/target/scope",
+        "value": "forecast-lifecycle/v1"
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/activity_checkpoints/0/integrity"
+  },
+  {
+    "name": "retained-forecast-forbids-timestamps",
+    "base": "tests/conformance/valid/retained-forecast.json",
+    "operations": [
+      {
+        "op": "add",
+        "path": "/questions/0/forecasts/0/integrity/timestamps",
+        "value": []
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/integrity"
+  },
+  {
+    "name": "retained-lifecycle-forbids-verified-at",
+    "base": "tests/conformance/valid/lifecycle-checkpoints.json",
+    "operations": [
+      {
+        "op": "add",
+        "path": "/questions/0/forecasts/0/activity_checkpoints/0/integrity/verified_at",
+        "value": "2026-09-03T10:00:07Z"
+      }
+    ],
+    "expect_contains": "/questions/0/forecasts/0/activity_checkpoints/0/integrity"
+  },
+  {
+    "name": "failed-forecast-requires-target",
+    "base": "tests/conformance/valid/retained-forecast.json",
+    "operations": [
+      {
+        "op": "replace",
+        "path": "/questions/0/forecasts/0/integrity",
+        "value": {
+          "status": "failed",
+          "failure_reason": "Retained evidence did not verify."
         }
       }
     ],

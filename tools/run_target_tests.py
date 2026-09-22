@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify v2 target vectors and lifecycle-event projection invariants."""
+"""Verify v2.2 target vectors and lifecycle-event projection invariants."""
 
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ from validate import load_document
 
 ROOT = Path(__file__).resolve().parents[1]
 VECTOR_PATHS = (
-    ROOT / "tests/vectors/forecast-envelope-v2-public-lifecycle.json",
-    ROOT / "tests/vectors/forecast-envelope-v2-sealed-lifecycle.json",
+    ROOT / "tests/vectors/forecast-envelope-v3-public-lifecycle.json",
+    ROOT / "tests/vectors/forecast-envelope-v3-sealed-lifecycle.json",
 )
-LIFECYCLE_VECTOR_PATH = ROOT / "tests/vectors/forecast-lifecycle-v1.json"
+LIFECYCLE_VECTOR_PATH = ROOT / "tests/vectors/forecast-lifecycle-v2.json"
 LIFECYCLE_FIXTURE_PATH = ROOT / "tests/conformance/valid/lifecycle-checkpoints.json"
 
 LIFECYCLE_CASES: dict[str, list[dict[str, Any]]] = {
@@ -63,6 +63,7 @@ LIFECYCLE_CASES: dict[str, list[dict[str, Any]]] = {
 
 def vector_ledger(vector: dict[str, Any]) -> dict[str, Any]:
     return {
+        "schema_version": "2.2.0",
         "questions": [
             {
                 "id": vector["question_id"],
@@ -115,6 +116,22 @@ def check_vector(path: Path) -> list[str]:
     if canonicalize(envelope_from_target_vector(checkpoint_vector)) != expected:
         errors.append("activity checkpoints change the canonical envelope target")
 
+    if vector["projection"] == "sealed":
+        revealed_vector = copy.deepcopy(vector)
+        revealed_vector["forecast"]["visibility"] = "revealed"
+        revealed_vector["forecast"]["representations"] = [
+            {"kind": "probability", "outcome": True, "probability": "0.50"}
+        ]
+        revealed_vector["forecast"]["rationale"] = "Authenticated private rationale."
+        revealed_vector["forecast"]["commitment"].update(
+            {
+                "revealed_at": "2026-09-04T12:00:00Z",
+                "revealed_key": "b" * 64,
+            }
+        )
+        if canonicalize(envelope_from_target_vector(revealed_vector)) != expected:
+            errors.append("reveal changes the original sealed envelope target")
+
     with TemporaryDirectory() as directory:
         output = Path(directory)
         report = build_targets(vector_ledger(vector), output)
@@ -128,6 +145,18 @@ def check_vector(path: Path) -> list[str]:
 
 def main() -> int:
     failed = False
+    with TemporaryDirectory() as directory:
+        output = Path(directory) / "must-not-exist"
+        try:
+            build_targets({"schema_version": "2.1.0", "questions": []}, output)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("target builder accepted a v2.1.0 ledger")
+        if output.exists():
+            raise AssertionError("target builder wrote before rejecting a v2.1.0 ledger")
+    print("OK   superseded contract rejected before target filesystem writes")
+
     for path in VECTOR_PATHS:
         errors = check_vector(path)
         if errors:
@@ -148,12 +177,14 @@ def main() -> int:
             output = Path(directory)
             report = build_targets(load_document(LIFECYCLE_FIXTURE_PATH), output)
             lifecycle_reports = [
-                item for item in report if item["scope"] == "forecast-lifecycle/v1"
+                item for item in report if item["scope"] == "forecast-lifecycle/v2"
             ]
             if len(lifecycle_reports) != 2:
                 raise AssertionError("reference builder did not produce both lifecycle checkpoints")
             for item in lifecycle_reports:
                 published = expected[item["head_event_id"]]
+                if not item.get("checkpoint_id") or not item.get("checkpoint_recorded_at"):
+                    raise AssertionError("lifecycle build report omitted explicit authoring fields")
                 built = Path(item["artifact_path"]).read_bytes()
                 if built.decode("utf-8") != published["canonical_target"]:
                     raise AssertionError("reference builder lifecycle bytes differ from vector")

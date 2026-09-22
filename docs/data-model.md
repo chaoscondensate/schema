@@ -22,7 +22,7 @@ or cross-record lookup.
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `schema_version` | yes | Exact contract version; this release requires `2.1.0`. |
+| `schema_version` | yes | Exact contract version; this release requires `2.2.0`. |
 | `ledger_id` | yes | Stable ID for this forecasting track record. |
 | `created_at` | yes | Ledger creation claim. |
 | `default_timezone` | yes | IANA timezone for authoring tools. |
@@ -238,7 +238,7 @@ append-only non-decreasing, and transitions must alternate between active and
 inactive states as defined above.
 
 Lifecycle events are activity metadata outside the immutable
-`forecast-envelope/v2` timestamp target. Appending `withdrawn`, `expired`, or
+`forecast-envelope/v3` timestamp target. Appending `withdrawn`, `expired`, or
 `reaffirmed` changes the derived active state but not the recorded belief,
 canonical target bytes, target SHA-256, or previously obtained RFC 3161
 evidence.
@@ -251,10 +251,14 @@ evidence for the complete prefix ending at that head. Checkpoint heads advance
 strictly through the event stream and checkpoint recording times never move
 backwards.
 
-The canonical `forecast-lifecycle/v1` target binds:
+Checkpoint `id` and `recorded_at` are explicit authoring fields. Implementations
+must not derive them from a wall clock, random UUID, filename, or hidden local
+state. A checkpoint is created in `retained` state before any timestamp attempt.
+
+The canonical `forecast-lifecycle/v2` target binds:
 
 - question ID and forecast ID;
-- SHA-256 of the corresponding `forecast-envelope/v2`;
+- SHA-256 of the corresponding `forecast-envelope/v3`;
 - the complete ordered lifecycle prefix;
 - the covered head event ID.
 
@@ -270,7 +274,7 @@ deleted.
 
 ## Sealed private bundle
 
-The closed `forecast-seal/v2` bundle has exactly four allowed fields:
+The closed `forecast-seal/v3` bundle has exactly four allowed fields:
 `representations`, `rationale`, `key_factors`, and `comment`. Only a non-empty
 `representations` array is required. The other three fields are independently
 optional.
@@ -329,9 +333,18 @@ the conditional relationship that made the child inapplicable.
 
 ## Integrity and scoring boundary
 
-`integrity` reports whether the canonical `forecast-envelope/v2` target is
-unanchored, pending, verified, or failed. A verified record has at least one
-verified RFC 3161 timestamp. Multiple TSA receipts are allowed.
+`integrity` reports whether the canonical `forecast-envelope/v3` target is
+unanchored, retained, pending, verified, or failed. `retained` contains only the
+closed target and proves no external time. A lifecycle checkpoint has no
+unanchored form and is created directly as retained. A verified record has at
+least one verified RFC 3161 timestamp. Multiple TSA receipts are allowed.
+
+The successful transition graph is `unanchored -> retained -> pending` or
+`verified`, followed by append-only pending/verified evidence updates. A pending
+verification may become failed; retry may move failed to pending or verified.
+Every transition after retained preserves the complete target object exactly.
+An operation that fails before durable evidence exists leaves the previous
+state unchanged.
 
 The ledger stores source facts needed for scoring but does not standardize one
 score. Consumers choose the scoring rule appropriate to the representation and

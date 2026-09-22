@@ -1,8 +1,0 @@
-{
-  "tag": "v2.0.0",
-  "files": {
-    "schema/forecast-ledger.schema.json": "efd87b7432f7cb017fbedaba217e4cd1d3bff06133457927fb786a249a040b21",
-    "tests/vectors/forecast-seal-v2.json": "7cd814473f3e84617660e704f1aea8dc48e4b4a32cc86b93fd46c1649a4728d5",
-    "tools/forecast_crypto.py": "0afb72fef2e142b5685854d9307dd9ca29a04352528bca9ee8f746f46668fc91"
-  }
-}

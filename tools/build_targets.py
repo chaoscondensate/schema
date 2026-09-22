@@ -15,10 +15,25 @@ from forecast_crypto import (
 )
 from validate import load_document
 
+LEDGER_SCHEMA_ID = (
+    "https://raw.githubusercontent.com/chaoscondensate/schema/"
+    "v2.2.0/schema/forecast-ledger.schema.json"
+)
+
+
+def require_current_contract(ledger: object) -> None:
+    """Reject superseded ledger identities before creating target files."""
+
+    if not isinstance(ledger, dict) or ledger.get("schema_version") != "2.2.0":
+        raise ValueError("target building requires Forecast Ledger v2.2.0")
+    if "$schema" in ledger and ledger["$schema"] != LEDGER_SCHEMA_ID:
+        raise ValueError("target building requires the v2.2.0 permanent schema ID")
+
 
 def build_targets(ledger: dict, output: Path) -> list[dict]:
-    """Write one canonical v2 envelope per forecast and return the build report."""
+    """Write canonical v3 envelopes and declared lifecycle-v2 checkpoint targets."""
 
+    require_current_contract(ledger)
     output.mkdir(parents=True, exist_ok=True)
     report = []
     for question in ledger["questions"]:
@@ -31,7 +46,7 @@ def build_targets(ledger: dict, output: Path) -> list[dict]:
             path.write_bytes(data)
             report.append(
                 {
-                    "scope": "forecast-envelope/v2",
+                    "scope": "forecast-envelope/v3",
                     "question_id": question["id"],
                     "forecast_id": forecast["id"],
                     "artifact_path": path.as_posix(),
@@ -52,9 +67,11 @@ def build_targets(ledger: dict, output: Path) -> list[dict]:
                 lifecycle_path.write_bytes(lifecycle_data)
                 report.append(
                     {
-                        "scope": "forecast-lifecycle/v1",
+                        "scope": "forecast-lifecycle/v2",
                         "question_id": question["id"],
                         "forecast_id": forecast["id"],
+                        "checkpoint_id": checkpoint["id"],
+                        "checkpoint_recorded_at": checkpoint["recorded_at"],
                         "head_event_id": checkpoint["head_event_id"],
                         "artifact_path": lifecycle_path.as_posix(),
                         "digest": sha256_ref(lifecycle_data),

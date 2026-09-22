@@ -1,6 +1,6 @@
 {
-  "$schema": "../../../schema/forecast-ledger.schema.json",
-  "schema_version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json",
+  "schema_version": "2.2.0",
   "ledger_id": "relationships-conformance",
   "created_at": "2026-09-01T09:00:00Z",
   "default_timezone": "UTC",

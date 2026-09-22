@@ -7,10 +7,16 @@ v1.3.0 artifacts remain verifiable but do not receive new features. A
 cryptographic protocol defect may require a new protocol identifier even when
 the surrounding ledger schema remains compatible.
 
-`v2.1.0` is an explicitly commissioned pre-adoption cutover that retains
-`forecast-seal/v2` while replacing its exact private-bundle contract and test
-vectors. Compatibility with v2.0.x seal bytes is intentionally not provided by
-the current tools; use the immutable historical tag to verify historical data.
+`v2.2.0` is an explicitly commissioned pre-adoption cutover that introduces
+`forecast-seal/v3`, `forecast-key/v3`, `forecast-envelope/v3`, and
+`forecast-lifecycle/v2`. Compatibility with earlier ledger, key, seal, target,
+or package bytes is intentionally absent; use the exact immutable historical
+tag and historical tools to inspect historical data.
+
+Protected key files, raw keys, salts, plaintext, credentials, and protected
+paths must never enter logs, normal output, evidence indexes, publication
+packages, or unrestricted diagnostics. A public `key_hint` is only an opaque
+logical hint and must not contain a credential or filesystem location.
 
 Validator diagnostics expose JSON Pointers and bounded source locations only.
 They must not include protected values, surrounding source text, credentials,

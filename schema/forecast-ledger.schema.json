@@ -1,14 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.1.0/schema/forecast-ledger.schema.json",
+  "$id": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json",
   "title": "Forecast Ledger",
   "description": "A portable, machine-verifiable ledger for quantitative forecasts made by one individual or team forecasting identity.",
   "type": "object",
   "required": ["schema_version", "ledger_id", "created_at", "default_timezone", "forecaster", "platforms", "questions"],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string", "format": "uri-reference" },
-    "schema_version": { "const": "2.1.0" },
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json"
+    },
+    "schema_version": { "const": "2.2.0" },
     "ledger_id": { "$ref": "#/$defs/slug" },
     "title": { "$ref": "#/$defs/nonEmptyString" },
     "description": { "$ref": "#/$defs/nonEmptyString" },
@@ -576,7 +578,7 @@
       "required": ["scope", "canonicalization", "artifact_path", "digest"],
       "additionalProperties": false,
       "properties": {
-        "scope": { "const": "forecast-envelope/v2" },
+        "scope": { "const": "forecast-envelope/v3" },
         "canonicalization": { "const": "RFC8785" },
         "artifact_path": { "$ref": "#/$defs/relativePath" },
         "digest": { "$ref": "#/$defs/sha256" }
@@ -587,7 +589,7 @@
       "required": ["scope", "canonicalization", "artifact_path", "digest"],
       "additionalProperties": false,
       "properties": {
-        "scope": { "const": "forecast-lifecycle/v1" },
+        "scope": { "const": "forecast-lifecycle/v2" },
         "canonicalization": { "const": "RFC8785" },
         "artifact_path": { "$ref": "#/$defs/relativePath" },
         "digest": { "$ref": "#/$defs/sha256" }
@@ -631,6 +633,15 @@
         "note": { "$ref": "#/$defs/nonEmptyString" }
       }
     },
+    "integrityRetained": {
+      "type": "object",
+      "required": ["status", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "retained" },
+        "target": { "$ref": "#/$defs/forecastTarget" }
+      }
+    },
     "integrityPending": {
       "type": "object",
       "required": ["status", "target", "timestamps"],
@@ -666,7 +677,7 @@
     },
     "integrityFailed": {
       "type": "object",
-      "required": ["status", "failure_reason"],
+      "required": ["status", "failure_reason", "target"],
       "additionalProperties": false,
       "properties": {
         "status": { "const": "failed" },
@@ -678,10 +689,20 @@
     "integrity": {
       "oneOf": [
         { "$ref": "#/$defs/integrityUnanchored" },
+        { "$ref": "#/$defs/integrityRetained" },
         { "$ref": "#/$defs/integrityPending" },
         { "$ref": "#/$defs/integrityVerified" },
         { "$ref": "#/$defs/integrityFailed" }
       ]
+    },
+    "lifecycleIntegrityRetained": {
+      "type": "object",
+      "required": ["status", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "retained" },
+        "target": { "$ref": "#/$defs/lifecycleTarget" }
+      }
     },
     "lifecycleIntegrityPending": {
       "type": "object",
@@ -729,6 +750,7 @@
     },
     "lifecycleIntegrity": {
       "oneOf": [
+        { "$ref": "#/$defs/lifecycleIntegrityRetained" },
         { "$ref": "#/$defs/lifecycleIntegrityPending" },
         { "$ref": "#/$defs/lifecycleIntegrityVerified" },
         { "$ref": "#/$defs/lifecycleIntegrityFailed" }
@@ -749,7 +771,7 @@
       "required": ["scheme", "commitment_hash", "encryption", "key_hint"],
       "additionalProperties": false,
       "properties": {
-        "scheme": { "const": "forecast-seal/v2" },
+        "scheme": { "const": "forecast-seal/v3" },
         "commitment_hash": { "$ref": "#/$defs/sha256" },
         "encryption": { "$ref": "#/$defs/encryption" },
         "key_hint": { "$ref": "#/$defs/nonEmptyString" }
@@ -760,7 +782,7 @@
       "required": ["scheme", "commitment_hash", "encryption", "key_hint", "revealed_at", "revealed_key"],
       "additionalProperties": false,
       "properties": {
-        "scheme": { "const": "forecast-seal/v2" },
+        "scheme": { "const": "forecast-seal/v3" },
         "commitment_hash": { "$ref": "#/$defs/sha256" },
         "encryption": { "$ref": "#/$defs/encryption" },
         "key_hint": { "$ref": "#/$defs/nonEmptyString" },
@@ -768,7 +790,7 @@
         "revealed_key": { "$ref": "#/$defs/hex32" }
       }
     },
-    "privateForecastBundleV2": {
+    "privateForecastBundleV3": {
       "type": "object",
       "required": ["representations"],
       "additionalProperties": false,

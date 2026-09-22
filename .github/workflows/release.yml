@@ -29,19 +29,24 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          test "$(git cat-file -t "${RELEASE_TAG}")" = "tag"
           test "v$(python -c 'import json; print(json.load(open("schema/forecast-ledger.schema.json"))["properties"]["schema_version"]["const"])')" = "${RELEASE_TAG}"
-          check-jsonschema --check-metaschema schema/forecast-ledger.schema.json
+          check-jsonschema --check-metaschema schema/*.schema.json
           python tools/run_fixture_tests.py
-          python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.json
-          python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
-          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
-          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
-          python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
-          python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
+          python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v3.json
+          python tools/forecast_crypto.py verify-key-vector tests/vectors/forecast-key-v3.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-public-lifecycle.json
+          python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v3-sealed-lifecycle.json
+          python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v2.json
+          python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v3-presence.json
+          python tools/sidecar_contracts.py tests/vectors/forecast-evidence-index-v1*.json tests/vectors/forecast-ledger-publication-v3*.json
           python tools/run_target_tests.py
           python tools/run_seal_tests.py
+          python tools/run_sidecar_tests.py
+          python tools/run_transition_tests.py
           python tools/run_diagnostic_tests.py
-          python tools/verify_legacy.py
+          python tools/generate_vectors.py
+          git diff --exit-code
           ruff check tools
 
       - name: Build release archive and checksums
@@ -56,12 +61,18 @@ jobs:
             "${RELEASE_COMMIT}"
           cp schema/forecast-ledger.schema.json \
             "dist/forecast-ledger-${RELEASE_TAG}.schema.json"
+          cp schema/forecast-key.schema.json \
+            "dist/forecast-key-${RELEASE_TAG}.schema.json"
+          cp schema/forecast-evidence-index.schema.json \
+            "dist/forecast-evidence-index-${RELEASE_TAG}.schema.json"
+          cp schema/forecast-ledger-publication.schema.json \
+            "dist/forecast-ledger-publication-${RELEASE_TAG}.schema.json"
           cp examples/valid/individual-ledger.json \
             "dist/forecast-ledger-${RELEASE_TAG}.example.json"
           cp examples/valid/team-ledger.yaml \
             "dist/forecast-ledger-${RELEASE_TAG}.example.yaml"
           cd dist
-          sha256sum forecast-ledger-* > SHA256SUMS
+          sha256sum * > SHA256SUMS
 
       - name: Publish immutable GitHub release
         env:

@@ -11,7 +11,7 @@ and algorithms are normative in
 | Schema plus semantic validator | Internal conformance | Historical existence or truth |
 | SHA-256 target digest | Equality to retained target bytes | When they existed |
 | RFC 3161 response | A TSA signed the target imprint at `genTime` | Authorship or outcome truth |
-| `forecast-seal/v2` | Hidden content opens uniquely and authentically | Existence before timestamping |
+| `forecast-seal/v3` | Hidden content opens uniquely and authentically | Existence before timestamping |
 | Git history | Repository publication sequence | Independent trusted time |
 | Resolution sources | Evidence for an outcome | Forecast timing |
 
@@ -79,34 +79,29 @@ python tools/build_targets.py ledger.yaml --output proofs/targets
 ```
 
 The builder resolves `question_revision_id`, embeds that entire revision in
-`forecast-envelope/v2`, canonicalizes it, writes the exact bytes, and prints the
+`forecast-envelope/v3`, canonicalizes it, writes the exact bytes, and prints the
 SHA-256 digest.
 
-### 4. Record pending integrity
+### 4. Retain the target before timestamping
 
 Copy the reported path and digest into the forecast:
 
 ```yaml
 integrity:
-  status: pending
+  status: retained
   target:
-    scope: forecast-envelope/v2
+    scope: forecast-envelope/v3
     canonicalization: RFC8785
     artifact_path: proofs/targets/<forecast-id>.json
     digest:
       algorithm: sha-256
       value: <64-lowercase-hex>
-  timestamps:
-    - type: rfc3161
-      request_path: proofs/timestamps/<forecast-id>.tsa-a.tsq
-      response_path: proofs/timestamps/<forecast-id>.tsa-a.tsr
-      tsa_url: https://tsa-a.example/
-      hash_algorithm: sha256
-      state: pending
 ```
 
 `integrity` is excluded from the target, so adding this block does not create a
-recursive hash.
+recursive hash. A conforming evidence-retaining application commits the target,
+this declaration, and its `forecast-evidence-index/v1` entry atomically. The
+standalone reference builder only reproduces the normative target bytes.
 
 `lifecycle_events` is also excluded. Appending a withdrawal, expiry, or
 reaffirmation changes derived activity state but does not require rebuilding or
@@ -132,6 +127,11 @@ curl --fail --silent --show-error \
 Multiple TSA entries are independent. A failure at one service does not
 invalidate another service's valid response.
 
+After retaining a request that does not yet have a verified response, move the
+same integrity object to `pending`, keep its target byte-for-byte unchanged, and
+append the timestamp declaration. A synchronous verified response may move
+directly from retained to verified.
+
 ### 6. Verify every response before marking it verified
 
 ```bash
@@ -154,13 +154,12 @@ and set integrity to `verified` with `verified_at`.
 
 ```bash
 python tools/validate.py ledger.yaml
-git add ledger.yaml proofs/targets/<forecast-id>.json proofs/timestamps/
-git commit -m "Record forecast <forecast-id>"
-git push
 ```
 
-The RFC 3161 response, not the Git commit time, supplies the external timing
-claim.
+Reconcile the declaration, `proofs/evidence-index.json`, and every indexed file
+before creating a `forecast-ledger-publication/v3` package. Git may distribute
+the resulting bytes, but the RFC 3161 response—not Git time—supplies the
+external timing claim.
 
 ## C. Record a sealed forecast
 
@@ -169,11 +168,11 @@ claim.
 ```python
 from secrets import token_bytes
 
-from tools.forecast_crypto import SEAL_SCHEME_V2, seal_forecast
+from tools.forecast_crypto import SEAL_SCHEME_V3, seal_forecast
 
 key = token_bytes(32)
 commitment, canonical_plaintext = seal_forecast(
-    scheme=SEAL_SCHEME_V2,
+    scheme=SEAL_SCHEME_V3,
     question_id="q-example",
     question_revision_id="qr-example-1",
     forecast_id="f-example-1",
@@ -273,13 +272,15 @@ non-decreasing. An event's `effective_at` must not precede
 `effective_at` or `forecast.recorded_at`. Event IDs are unique.
 
 A lifecycle event changes whether a forecast is active; it does not change the
-recorded belief and remains outside `forecast-envelope/v2`. The original target
+recorded belief and remains outside `forecast-envelope/v3`. The original target
 and RFC 3161 evidence remain valid after the event.
 
 ### Create an activity checkpoint
 
-After appending and validating events, add a checkpoint whose
-`head_event_id` names the newest covered event. Run the target builder:
+After appending and validating events, add a checkpoint whose `head_event_id`
+names the newest covered event. Supply its `id` and `recorded_at` explicitly and
+create its integrity as retained; these authoring fields are never generated
+implicitly. Run the target builder:
 
 ```bash
 python tools/build_targets.py ledger.yaml --output proofs/targets
@@ -289,7 +290,23 @@ For each checkpoint it writes
 `<forecast-id>.lifecycle.<head-event-id>.json`. Timestamp those exact bytes with
 the RFC 3161 commands from B.5 and retain target, request, response, and trust
 chain. Record the target under checkpoint `integrity` with scope
-`forecast-lifecycle/v1`.
+`forecast-lifecycle/v2`.
+
+```yaml
+activity_checkpoints:
+  - id: checkpoint-withdrawal
+    head_event_id: event-withdrawn
+    recorded_at: "2026-09-03T10:00:06Z"
+    integrity:
+      status: retained
+      target:
+        scope: forecast-lifecycle/v2
+        canonicalization: RFC8785
+        artifact_path: proofs/targets/f-example.lifecycle.event-withdrawn.json
+        digest:
+          algorithm: sha-256
+          value: <64-lowercase-hex>
+```
 
 Verification rebuilds the complete prefix through the covered head. Mutation,
 deletion, reordering, or binding the prefix to another forecast changes the

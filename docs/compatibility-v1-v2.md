@@ -6,9 +6,8 @@ Forecast Ledger v2 is a new incompatible contract. v1.3.0 documents remain
 valid only against the v1.3.0 schema URL. Consumers must not relabel a v1
 document as v2 or infer missing v2 semantics.
 
-The `v1.3.0` Git tag, schema bytes, and seal vector are permanent. The current
-repository tools verify historical `forecast-seal/v1` vectors but generate v2
-envelopes for v2 ledgers.
+The `v1.3.0` Git tag, schema bytes, and seal vector are permanent. Its tagged
+tools—not the current v2.2.0 runtime—verify those historical bytes.
 
 ## Why a major version was required
 
@@ -65,9 +64,9 @@ An automated migration must stop or emit an explicit review item when:
 ## Consumer support policy
 
 Consumers should select behavior from `schema_version`, not feature detection.
-Supporting v1.3.0 and v2.1.0 means validating each document against its own
-permanent schema and using the matching envelope/seal profile. There is no
-mixed-version ledger and no v2 envelope around a v1 forecast.
+An operator needing an older contract must use its exact tagged implementation.
+The v2.2.0 runtime does not support multiple contract versions. There is no
+mixed-version ledger and no current envelope around a historical forecast.
 
 ## v2.0.1 normative erratum
 
@@ -98,14 +97,13 @@ only with its exact v2.0.x tagged implementation.
 All prior tags remain immutable. Do not relabel a v2.0.x document, seal,
 envelope, or evidence package as v2.1.0.
 
-## Frozen legacy verification
+## v2.2.0 cryptographic reset
 
-The legacy manifests record expected hashes for v1.3.0, v2.0.0, and v2.0.1
-schema, vector, and reference implementation artifacts. Run:
+v2.2.0 accepts only `forecast-seal/v3`, `forecast-key/v3`,
+`forecast-envelope/v3`, `forecast-lifecycle/v2`, and publication v3. It adds
+retained target states and the evidence-index sidecar. Earlier schemas,
+profiles, packages, keys, and vectors are not accepted or converted.
 
-```bash
-python tools/verify_legacy.py
-```
-
-The command reads those files directly from their Git tags and rejects any byte
-change or tag loss. The release workflow runs this check before publication.
+All earlier Git tags remain immutable historical sources. The v2.2.0 source and
+runtime intentionally contain no positive legacy corpus, legacy parser, or
+compatibility command.

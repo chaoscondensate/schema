@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json",
   "schema_version": "2.2.0",
-  "ledger_id": "alex-example-forecasts",
+  "ledger_id": "retained-forecast-fixture",
   "title": "Alex Example's Forecast Ledger",
   "description": "A v2 ledger demonstrating question revisions and exact forecast representations.",
   "created_at": "2026-08-01T09:00:00+01:00",
@@ -10,7 +10,9 @@
     "id": "alex-example",
     "kind": "individual",
     "name": "Alex Example",
-    "contact": { "website": "https://example.com/forecasts" }
+    "contact": {
+      "website": "https://example.com/forecasts"
+    }
   },
   "publication": {
     "history": "git",
@@ -54,19 +56,29 @@
           "resolution_criteria": "Resolve YES if the official September decision lowers the headline policy rate relative to the August level; otherwise resolve NO.",
           "forecasting_opens_at": "2026-08-01T09:05:00+01:00",
           "expected_resolution_at": "2026-09-17T12:30:00+01:00",
-          "outcome_space": { "kind": "binary" },
-          "domain": { "kind": "binary" },
+          "outcome_space": {
+            "kind": "binary"
+          },
+          "domain": {
+            "kind": "binary"
+          },
           "provenance": {
             "platform": "metaculus",
             "remote_object_id": "example-1001",
             "remote_object_version": "2026-08-01T08:05:00Z",
             "url": "https://www.metaculus.com/questions/example-1001/",
             "retrieved_at": "2026-08-01T09:05:00+01:00",
-            "importer": { "name": "example-importer", "version": "2.0.1" }
+            "importer": {
+              "name": "example-importer",
+              "version": "2.0.1"
+            }
           }
         }
       ],
-      "tags": ["economics", "monetary-policy"],
+      "tags": [
+        "economics",
+        "monetary-policy"
+      ],
       "forecasts": [
         {
           "id": "f-central-bank-cut-001",
@@ -75,13 +87,28 @@
           "recorded_at": "2026-08-02T10:01:00+01:00",
           "visibility": "public",
           "representations": [
-            { "kind": "probability", "outcome": true, "probability": "0.62" }
+            {
+              "kind": "probability",
+              "outcome": true,
+              "probability": "0.62"
+            }
           ],
           "rationale": "Inflation is falling, but wage growth remains elevated.",
-          "key_factors": ["inflation trend", "services wage growth"],
+          "key_factors": [
+            "inflation trend",
+            "services wage growth"
+          ],
           "integrity": {
-            "status": "unanchored",
-            "note": "Example fixture only."
+            "status": "retained",
+            "target": {
+              "scope": "forecast-envelope/v3",
+              "canonicalization": "RFC8785",
+              "artifact_path": "tests/vectors/targets/f-central-bank-cut-001.forecast-envelope-v3.json",
+              "digest": {
+                "algorithm": "sha-256",
+                "value": "1b7d5f39efa72e891b4ad573503b3665eea1c5aeddb74f4072e05aaa3c7a6f7b"
+              }
+            }
           }
         }
       ],
@@ -115,16 +142,27 @@
           "title": "Which coalition will form the next government?",
           "resolution_criteria": "Resolve to the coalition whose prime minister is formally appointed first after the election.",
           "expected_resolution_at": "2026-10-15T12:00:00+01:00",
-          "outcome_space": { "kind": "categorical" },
+          "outcome_space": {
+            "kind": "categorical"
+          },
           "domain": {
             "kind": "categorical",
             "option_set": {
               "id": "coalitions",
               "version": 1,
               "options": [
-                { "id": "centre-left", "label": "Centre-left coalition" },
-                { "id": "centre-right", "label": "Centre-right coalition" },
-                { "id": "other", "label": "Any other coalition" }
+                {
+                  "id": "centre-left",
+                  "label": "Centre-left coalition"
+                },
+                {
+                  "id": "centre-right",
+                  "label": "Centre-right coalition"
+                },
+                {
+                  "id": "other",
+                  "label": "Any other coalition"
+                }
               ]
             }
           }
@@ -136,17 +174,31 @@
           "title": "Which coalition will form the next government after the 2026 election?",
           "resolution_criteria": "Resolve to the coalition whose prime minister is formally appointed first after the 2026 election.",
           "expected_resolution_at": "2026-10-15T12:00:00+01:00",
-          "outcome_space": { "kind": "categorical" },
+          "outcome_space": {
+            "kind": "categorical"
+          },
           "domain": {
             "kind": "categorical",
             "option_set": {
               "id": "coalitions",
               "version": 2,
               "options": [
-                { "id": "centre-left", "label": "Centre-left coalition" },
-                { "id": "centre-right", "label": "Centre-right coalition" },
-                { "id": "unity", "label": "National unity coalition" },
-                { "id": "other", "label": "Any other outcome" }
+                {
+                  "id": "centre-left",
+                  "label": "Centre-left coalition"
+                },
+                {
+                  "id": "centre-right",
+                  "label": "Centre-right coalition"
+                },
+                {
+                  "id": "unity",
+                  "label": "National unity coalition"
+                },
+                {
+                  "id": "other",
+                  "label": "Any other outcome"
+                }
               ]
             }
           }
@@ -162,15 +214,30 @@
           "representations": [
             {
               "kind": "pmf",
-              "option_set_ref": { "id": "coalitions", "version": 1 },
+              "option_set_ref": {
+                "id": "coalitions",
+                "version": 1
+              },
               "entries": [
-                { "option_id": "centre-left", "probability": "0.48" },
-                { "option_id": "centre-right", "probability": "0.39" },
-                { "option_id": "other", "probability": "0.13" }
+                {
+                  "option_id": "centre-left",
+                  "probability": "0.48"
+                },
+                {
+                  "option_id": "centre-right",
+                  "probability": "0.39"
+                },
+                {
+                  "option_id": "other",
+                  "probability": "0.13"
+                }
               ]
             }
           ],
-          "integrity": { "status": "unanchored", "note": "Example fixture only." }
+          "integrity": {
+            "status": "unanchored",
+            "note": "Example fixture only."
+          }
         },
         {
           "id": "f-election-coalition-002",
@@ -182,12 +249,27 @@
           "representations": [
             {
               "kind": "pmf",
-              "option_set_ref": { "id": "coalitions", "version": 2 },
+              "option_set_ref": {
+                "id": "coalitions",
+                "version": 2
+              },
               "entries": [
-                { "option_id": "centre-left", "probability": "0.42" },
-                { "option_id": "centre-right", "probability": "0.35" },
-                { "option_id": "unity", "probability": "0.15" },
-                { "option_id": "other", "probability": "0.08" }
+                {
+                  "option_id": "centre-left",
+                  "probability": "0.42"
+                },
+                {
+                  "option_id": "centre-right",
+                  "probability": "0.35"
+                },
+                {
+                  "option_id": "unity",
+                  "probability": "0.15"
+                },
+                {
+                  "option_id": "other",
+                  "probability": "0.08"
+                }
               ]
             }
           ],
@@ -207,7 +289,10 @@
               "reason": "The correction did not change the probabilities."
             }
           ],
-          "integrity": { "status": "unanchored", "note": "Example fixture only." }
+          "integrity": {
+            "status": "unanchored",
+            "note": "Example fixture only."
+          }
         }
       ]
     },
@@ -224,24 +309,60 @@
           "title": "What will Example Corp report as third-quarter revenue?",
           "resolution_criteria": "Resolve to third-quarter revenue in the first official earnings release, in millions of USD.",
           "expected_resolution_at": "2026-10-21T12:00:00+01:00",
-          "outcome_space": { "kind": "numeric" },
+          "outcome_space": {
+            "kind": "numeric"
+          },
           "domain": {
             "kind": "numeric",
             "bounds": {
-              "lower": { "value": "0", "inclusive": true },
-              "upper": { "value": "2000", "inclusive": true }
+              "lower": {
+                "value": "0",
+                "inclusive": true
+              },
+              "upper": {
+                "value": "2000",
+                "inclusive": true
+              }
             },
-            "values": { "kind": "step", "step": "0.1", "origin": "0" },
+            "values": {
+              "kind": "step",
+              "step": "0.1",
+              "origin": "0"
+            },
             "elicitation_scale": "linear",
-            "unit": { "name": "million US dollars", "symbol": "USDm" },
+            "unit": {
+              "name": "million US dollars",
+              "symbol": "USDm"
+            },
             "bin_sets": [
               {
                 "id": "revenue-bins",
                 "version": 1,
                 "bins": [
-                  { "id": "low", "label": "Below consensus", "lower": "700", "upper": "820", "lower_inclusive": true, "upper_inclusive": false },
-                  { "id": "middle", "label": "Near consensus", "lower": "820", "upper": "880", "lower_inclusive": true, "upper_inclusive": false },
-                  { "id": "high", "label": "Above consensus", "lower": "880", "upper": "1000", "lower_inclusive": true, "upper_inclusive": true }
+                  {
+                    "id": "low",
+                    "label": "Below consensus",
+                    "lower": "700",
+                    "upper": "820",
+                    "lower_inclusive": true,
+                    "upper_inclusive": false
+                  },
+                  {
+                    "id": "middle",
+                    "label": "Near consensus",
+                    "lower": "820",
+                    "upper": "880",
+                    "lower_inclusive": true,
+                    "upper_inclusive": false
+                  },
+                  {
+                    "id": "high",
+                    "label": "Above consensus",
+                    "lower": "880",
+                    "upper": "1000",
+                    "lower_inclusive": true,
+                    "upper_inclusive": true
+                  }
                 ]
               }
             ]
@@ -256,23 +377,45 @@
           "recorded_at": "2026-08-11T10:01:00+01:00",
           "visibility": "public",
           "representations": [
-            { "kind": "point", "statistic": "median", "value": "842.5" },
+            {
+              "kind": "point",
+              "statistic": "median",
+              "value": "842.5"
+            },
             {
               "kind": "quantiles",
               "interpolation": "linear",
               "points": [
-                { "level": "0.1", "value": "770" },
-                { "level": "0.5", "value": "842.5" },
-                { "level": "0.9", "value": "925" }
+                {
+                  "level": "0.1",
+                  "value": "770"
+                },
+                {
+                  "level": "0.5",
+                  "value": "842.5"
+                },
+                {
+                  "level": "0.9",
+                  "value": "925"
+                }
               ]
             },
             {
               "kind": "cdf",
               "interpolation": "linear",
               "points": [
-                { "value": "780", "probability": "0.1" },
-                { "value": "850", "probability": "0.6" },
-                { "value": "950", "probability": "0.95" }
+                {
+                  "value": "780",
+                  "probability": "0.1"
+                },
+                {
+                  "value": "850",
+                  "probability": "0.6"
+                },
+                {
+                  "value": "950",
+                  "probability": "0.95"
+                }
               ],
               "left_tail_probability": "0.05",
               "right_tail_probability": "0.05"
@@ -280,22 +423,42 @@
             {
               "kind": "credible_intervals",
               "intervals": [
-                { "coverage": "0.8", "interval_kind": "equal_tailed", "lower": "770", "upper": "925" }
+                {
+                  "coverage": "0.8",
+                  "interval_kind": "equal_tailed",
+                  "lower": "770",
+                  "upper": "925"
+                }
               ]
             },
             {
               "kind": "binned_pmf",
-              "bin_set_ref": { "id": "revenue-bins", "version": 1 },
+              "bin_set_ref": {
+                "id": "revenue-bins",
+                "version": 1
+              },
               "entries": [
-                { "bin_id": "low", "probability": "0.25" },
-                { "bin_id": "middle", "probability": "0.45" },
-                { "bin_id": "high", "probability": "0.2" }
+                {
+                  "bin_id": "low",
+                  "probability": "0.25"
+                },
+                {
+                  "bin_id": "middle",
+                  "probability": "0.45"
+                },
+                {
+                  "bin_id": "high",
+                  "probability": "0.2"
+                }
               ],
               "left_tail_probability": "0.04",
               "right_tail_probability": "0.06"
             }
           ],
-          "integrity": { "status": "unanchored", "note": "Example fixture only." }
+          "integrity": {
+            "status": "unanchored",
+            "note": "Example fixture only."
+          }
         }
       ]
     },
@@ -312,14 +475,26 @@
           "title": "On what date will Example Corp make its new product generally available?",
           "resolution_criteria": "Resolve to the first calendar date of unrestricted purchase from the vendor website.",
           "expected_resolution_at": "2026-12-31T23:59:59Z",
-          "outcome_space": { "kind": "date" },
+          "outcome_space": {
+            "kind": "date"
+          },
           "domain": {
             "kind": "date",
             "bounds": {
-              "lower": { "value": "2026-09-01", "inclusive": true },
-              "upper": { "value": "2027-03-31", "inclusive": true }
+              "lower": {
+                "value": "2026-09-01",
+                "inclusive": true
+              },
+              "upper": {
+                "value": "2027-03-31",
+                "inclusive": true
+              }
             },
-            "values": { "kind": "step", "step": "P1D", "origin": "2026-09-01" }
+            "values": {
+              "kind": "step",
+              "step": "P1D",
+              "origin": "2026-09-01"
+            }
           }
         }
       ],
@@ -331,18 +506,34 @@
           "recorded_at": "2026-08-12T09:11:00+01:00",
           "visibility": "public",
           "representations": [
-            { "kind": "point", "statistic": "median", "value": "2026-11-15" },
+            {
+              "kind": "point",
+              "statistic": "median",
+              "value": "2026-11-15"
+            },
             {
               "kind": "quantiles",
               "interpolation": "none",
               "points": [
-                { "level": "0.1", "value": "2026-10-20" },
-                { "level": "0.5", "value": "2026-11-15" },
-                { "level": "0.9", "value": "2026-12-20" }
+                {
+                  "level": "0.1",
+                  "value": "2026-10-20"
+                },
+                {
+                  "level": "0.5",
+                  "value": "2026-11-15"
+                },
+                {
+                  "level": "0.9",
+                  "value": "2026-12-20"
+                }
               ]
             }
           ],
-          "integrity": { "status": "unanchored", "note": "Example fixture only." }
+          "integrity": {
+            "status": "unanchored",
+            "note": "Example fixture only."
+          }
         }
       ]
     }

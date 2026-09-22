@@ -1,6 +1,6 @@
 {
-  "$schema": "../../../schema/forecast-ledger.schema.json",
-  "schema_version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/chaoscondensate/schema/v2.2.0/schema/forecast-ledger.schema.json",
+  "schema_version": "2.2.0",
   "ledger_id": "lifecycle-checkpoint-fixture",
   "created_at": "2026-09-01T09:00:00Z",
   "default_timezone": "UTC",
@@ -24,8 +24,12 @@
           "title": "Will the example event occur?",
           "resolution_criteria": "Resolve YES if the example event occurs.",
           "expected_resolution_at": "2026-12-31T23:59:59Z",
-          "outcome_space": { "kind": "binary" },
-          "domain": { "kind": "binary" }
+          "outcome_space": {
+            "kind": "binary"
+          },
+          "domain": {
+            "kind": "binary"
+          }
         }
       ],
       "forecasts": [
@@ -36,7 +40,11 @@
           "recorded_at": "2026-09-02T10:00:05Z",
           "visibility": "public",
           "representations": [
-            { "kind": "probability", "outcome": true, "probability": "0.65" }
+            {
+              "kind": "probability",
+              "outcome": true,
+              "probability": "0.65"
+            }
           ],
           "lifecycle_events": [
             {
@@ -60,15 +68,14 @@
               "head_event_id": "event-withdrawn",
               "recorded_at": "2026-09-03T10:00:06Z",
               "integrity": {
-                "status": "failed",
-                "failure_reason": "Timestamp service was unavailable in this fixture.",
+                "status": "retained",
                 "target": {
-                  "scope": "forecast-lifecycle/v1",
+                  "scope": "forecast-lifecycle/v2",
                   "canonicalization": "RFC8785",
-                  "artifact_path": "tests/vectors/targets/forecast-lifecycle-v1-withdrawal.json",
+                  "artifact_path": "tests/vectors/targets/forecast-lifecycle-v2-withdrawn.json",
                   "digest": {
                     "algorithm": "sha-256",
-                    "value": "6494b4d78a2a59e7e3a9292756725e0e7b61da74682c43bc45025386ffcb56bf"
+                    "value": "ac44035e919163f36c4815ed8e6927493ed5037cc9d560fc86262f1aae9406c4"
                   }
                 }
               }
@@ -78,21 +85,23 @@
               "head_event_id": "event-reaffirmed",
               "recorded_at": "2026-09-04T10:00:06Z",
               "integrity": {
-                "status": "failed",
-                "failure_reason": "Timestamp service was unavailable in this fixture.",
+                "status": "retained",
                 "target": {
-                  "scope": "forecast-lifecycle/v1",
+                  "scope": "forecast-lifecycle/v2",
                   "canonicalization": "RFC8785",
-                  "artifact_path": "tests/vectors/targets/forecast-lifecycle-v1-reaffirmation.json",
+                  "artifact_path": "tests/vectors/targets/forecast-lifecycle-v2-reaffirmed.json",
                   "digest": {
                     "algorithm": "sha-256",
-                    "value": "be4440f5ac52f518301d73223c218a686930a42dde48ecf9cdbf723594450952"
+                    "value": "82df2e6642b33724f07e498b81775b031b4f52b66736d76f8374baa126277fcc"
                   }
                 }
               }
             }
           ],
-          "integrity": { "status": "unanchored", "note": "Vector fixture." }
+          "integrity": {
+            "status": "unanchored",
+            "note": "Vector fixture."
+          }
         }
       ]
     }

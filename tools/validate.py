@@ -30,6 +30,14 @@ CANONICAL_DECIMAL = re.compile(
     r"^(?:0|-?[1-9][0-9]*|-?(?:0|[1-9][0-9]*)\.[0-9]*[1-9])$"
 )
 
+INTEGRITY_TRANSITIONS = {
+    "unanchored": {"retained"},
+    "retained": {"pending", "verified"},
+    "pending": {"pending", "verified", "failed"},
+    "failed": {"pending", "verified"},
+    "verified": {"verified"},
+}
+
 
 def pointer_join(path: str, token: str | int) -> str:
     escaped = str(token).replace("~", "~0").replace("/", "~1")
@@ -220,7 +228,7 @@ def check_provenance(
 def check_integrity(
     integrity: dict[str, Any], repository_root: Path, path: str, problems: Problems
 ) -> None:
-    if integrity["status"] in {"unanchored", "failed"} or "target" not in integrity:
+    if integrity["status"] == "unanchored":
         return
     target = integrity["target"]
     check_digest(
@@ -230,6 +238,38 @@ def check_integrity(
         f"{path}.target.digest.value",
         problems,
     )
+
+
+def check_integrity_transition(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    """Check one normative integrity state transition without performing effects."""
+
+    errors: list[str] = []
+    before_status = before.get("status")
+    after_status = after.get("status")
+    if after_status not in INTEGRITY_TRANSITIONS.get(before_status, set()):
+        errors.append(f"integrity transition {before_status!r} -> {after_status!r} is forbidden")
+    if "target" in before and after.get("target") != before["target"]:
+        errors.append("target identity must not change after retention")
+    before_timestamps = before.get("timestamps", [])
+    after_timestamps = after.get("timestamps", [])
+    if len(after_timestamps) < len(before_timestamps):
+        errors.append("timestamp evidence must be append-only")
+    else:
+        for old, new in zip(before_timestamps, after_timestamps, strict=False):
+            retained = {key: value for key, value in old.items() if key != "state"}
+            if any(new.get(key) != value for key, value in retained.items()):
+                errors.append("timestamp evidence must be append-only")
+                break
+            if old.get("state") == "verified" and new.get("state") != "verified":
+                errors.append("verified timestamp evidence must not regress")
+                break
+            if old.get("state") == "pending" and new.get("state") not in {
+                "pending",
+                "verified",
+            }:
+                errors.append("pending timestamp evidence has an invalid transition")
+                break
+    return errors
 
 
 def parse_duration(value: str, kind: str) -> timedelta:
@@ -648,7 +688,7 @@ def check_activity_checkpoints(
             if integrity["target"]["digest"]["value"] != expected_digest:
                 problems.add(
                     f"{cpath}.integrity.target.digest.value",
-                    "does not match the canonical forecast-lifecycle/v1 target",
+                    "does not match the canonical forecast-lifecycle/v2 target",
                 )
         previous_head_index = head_index
         previous_recorded = checkpoint_recorded
