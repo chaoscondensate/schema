@@ -22,7 +22,7 @@ or cross-record lookup.
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `schema_version` | yes | Exact contract version; this release requires `2.0.1`. |
+| `schema_version` | yes | Exact contract version; this release requires `2.1.0`. |
 | `ledger_id` | yes | Stable ID for this forecasting track record. |
 | `created_at` | yes | Ledger creation claim. |
 | `default_timezone` | yes | IANA timezone for authoring tools. |
@@ -227,11 +227,59 @@ Events are ordered by both effective and recording time. They do not overwrite
 the original forecast or replace a new forecast update. A changed belief is a
 new forecast with `supersedes_forecast_id`.
 
+Every event must satisfy both forecast-relative chronology constraints:
+
+- `effective_at` is not earlier than the forecast's `forecasted_at`;
+- `recorded_at` is not earlier than either the event's `effective_at` or the
+  forecast's `recorded_at`.
+
+Event IDs are unique. Effective times are non-decreasing, recording times are
+append-only non-decreasing, and transitions must alternate between active and
+inactive states as defined above.
+
 Lifecycle events are activity metadata outside the immutable
 `forecast-envelope/v2` timestamp target. Appending `withdrawn`, `expired`, or
 `reaffirmed` changes the derived active state but not the recorded belief,
 canonical target bytes, target SHA-256, or previously obtained RFC 3161
 evidence.
+
+### Activity checkpoints
+
+`activity_checkpoints` is an optional append-only forecast collection. Each
+checkpoint names one lifecycle head event and retains integrity/timestamp
+evidence for the complete prefix ending at that head. Checkpoint heads advance
+strictly through the event stream and checkpoint recording times never move
+backwards.
+
+The canonical `forecast-lifecycle/v1` target binds:
+
+- question ID and forecast ID;
+- SHA-256 of the corresponding `forecast-envelope/v2`;
+- the complete ordered lifecycle prefix;
+- the covered head event ID.
+
+The target is closed. It never includes checkpoint objects, integrity records,
+timestamp metadata, or later events. Consequently, later lifecycle events do
+not invalidate an earlier checkpoint; they make its coverage partial until a
+new checkpoint is created.
+
+A retained checkpoint and target can detect mutation, deletion, or reordering
+inside its covered prefix. It cannot prove historical existence if every copy
+of the event, checkpoint, target, evidence package, and external publication is
+deleted.
+
+## Sealed private bundle
+
+The closed `forecast-seal/v2` bundle has exactly four allowed fields:
+`representations`, `rationale`, `key_factors`, and `comment`. Only a non-empty
+`representations` array is required. The other three fields are independently
+optional.
+
+Absence is semantic and authenticated. An absent `rationale` or `comment` is
+different from an explicitly supplied empty string, and absent `key_factors`
+is different from an explicitly supplied empty array. A revealed forecast
+requires `representations` and a revealed commitment, while optional private
+fields appear only when they were present in the authenticated bundle.
 
 ## Platform provenance
 

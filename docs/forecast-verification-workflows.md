@@ -28,6 +28,8 @@ For every timestamped forecast retain:
 - CA bundle required to validate each response;
 - for sealed forecasts, original commitment, nonce, and ciphertext;
 - after reveal, disclosed key and exact public plaintext mirror.
+- for each activity checkpoint, its canonical lifecycle target and independent
+  RFC 3161 evidence package.
 
 The verifier does not need a live TSA. It does need the original evidence files
 and an acceptable retained trust chain.
@@ -176,15 +178,10 @@ commitment, canonical_plaintext = seal_forecast(
     question_revision_id="qr-example-1",
     forecast_id="f-example-1",
     bundle={
-        "question_revision_id": "qr-example-1",
-        "forecasted_at": "2026-09-21T10:05:00Z",
-        "recorded_at": "2026-09-21T10:05:10Z",
         "representations": [
             {"kind": "probability", "outcome": True, "probability": "0.62"}
         ],
-        "rationale": "...",
-        "key_factors": ["..."],
-        "comment": "Reveal after resolution.",
+        # rationale, key_factors, and comment are independently optional.
     },
     salt=token_bytes(32),
     key=key,
@@ -227,9 +224,12 @@ Stop if authentication, commitment, canonicalization, or ID binding fails.
 
 ### 2. Publish the exact mirror
 
-Change visibility to `revealed`, retain the original cryptographic fields, and
-add `revealed_at`, `revealed_key`, and the exact bundle fields. Do not edit the
-decrypted values for presentation.
+Use `reveal_into_forecast()` or equivalent strict logic. Change visibility to
+`revealed`, retain the original cryptographic fields, and add `revealed_at`,
+`revealed_key`, required `representations`, and only those optional fields that
+were present in the authenticated bundle. Do not invent empty strings or an
+empty `key_factors` array for absent fields, and do not edit decrypted values
+for presentation.
 
 ### 3. Validate and compare the target
 
@@ -268,9 +268,37 @@ Platform timestamps remain provenance claims even when transported over TLS.
 
 Append `withdrawn` or `expired` only while the forecast is active. Append
 `reaffirmed` only while inactive. Keep effective and recording timestamps
-non-decreasing. A lifecycle event changes whether a forecast is active; it does
-not change the recorded belief and is outside the immutable timestamp target.
-The original target and RFC 3161 evidence remain valid after the event.
+non-decreasing. An event's `effective_at` must not precede
+`forecast.forecasted_at`; its `recorded_at` must not precede either its own
+`effective_at` or `forecast.recorded_at`. Event IDs are unique.
+
+A lifecycle event changes whether a forecast is active; it does not change the
+recorded belief and remains outside `forecast-envelope/v2`. The original target
+and RFC 3161 evidence remain valid after the event.
+
+### Create an activity checkpoint
+
+After appending and validating events, add a checkpoint whose
+`head_event_id` names the newest covered event. Run the target builder:
+
+```bash
+python tools/build_targets.py ledger.yaml --output proofs/targets
+```
+
+For each checkpoint it writes
+`<forecast-id>.lifecycle.<head-event-id>.json`. Timestamp those exact bytes with
+the RFC 3161 commands from B.5 and retain target, request, response, and trust
+chain. Record the target under checkpoint `integrity` with scope
+`forecast-lifecycle/v1`.
+
+Verification rebuilds the complete prefix through the covered head. Mutation,
+deletion, reordering, or binding the prefix to another forecast changes the
+canonical target. Later events leave the checkpoint valid but mean it covers
+only an earlier prefix until a new checkpoint is appended.
+
+Deleting every copy of the event, checkpoint, target, evidence package, and
+external publication removes the evidence of prior existence; the contract
+does not claim otherwise.
 
 ## G. Resolve a question
 
@@ -296,7 +324,7 @@ Start from an exact tag or Git commit, never a moving branch.
 4. Check signed `genTime`, policy OID, serial number, and message imprint against
    ledger metadata.
 5. For resolved questions, require a valid `genTime` before the known outcome.
-6. For reveals, perform the ten reveal checks in the cryptographic specification.
+6. For reveals, perform the eleven reveal checks in the cryptographic specification.
 7. Evaluate resolution sources independently against the bound criteria.
 8. Report each evidence claim separately.
 

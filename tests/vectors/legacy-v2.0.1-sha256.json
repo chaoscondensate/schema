@@ -1,0 +1,10 @@
+{
+  "tag": "v2.0.1",
+  "files": {
+    "schema/forecast-ledger.schema.json": "5ceeeca7b2b3e46884c116aeb4f20998daf619569c0191728f574c245a4a595b",
+    "tests/vectors/forecast-seal-v2.json": "7cd814473f3e84617660e704f1aea8dc48e4b4a32cc86b93fd46c1649a4728d5",
+    "tests/vectors/forecast-envelope-v2-public-lifecycle.json": "03ad733808e3b0809af0d6a7d8e4e3f9d39906b79e3318fb9b2f95ad4d1cdc99",
+    "tests/vectors/forecast-envelope-v2-sealed-lifecycle.json": "3b03922755895fba91d2d19cbafa11ba5a232ca91b38f46bbc269688e8ee3b3d",
+    "tools/forecast_crypto.py": "7aa2d378d9ae4e1f994d60f2ac622495d9e84a687c95ffbd73f1b83c2e20dc41"
+  }
+}

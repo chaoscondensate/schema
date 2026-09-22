@@ -14,14 +14,18 @@ from build_targets import build_targets
 from forecast_crypto import (
     canonicalize,
     envelope_from_target_vector,
+    verify_lifecycle_vector,
     verify_target_vector,
 )
+from validate import load_document
 
 ROOT = Path(__file__).resolve().parents[1]
 VECTOR_PATHS = (
     ROOT / "tests/vectors/forecast-envelope-v2-public-lifecycle.json",
     ROOT / "tests/vectors/forecast-envelope-v2-sealed-lifecycle.json",
 )
+LIFECYCLE_VECTOR_PATH = ROOT / "tests/vectors/forecast-lifecycle-v1.json"
+LIFECYCLE_FIXTURE_PATH = ROOT / "tests/conformance/valid/lifecycle-checkpoints.json"
 
 LIFECYCLE_CASES: dict[str, list[dict[str, Any]]] = {
     "withdrawn": [
@@ -99,6 +103,18 @@ def check_vector(path: Path) -> list[str]:
         if candidate != baseline:
             errors.append(f"{name} changes the canonical target")
 
+    checkpoint_vector = copy.deepcopy(vector)
+    checkpoint_vector["forecast"]["activity_checkpoints"] = [
+        {
+            "id": "checkpoint-excluded-from-envelope",
+            "head_event_id": "event-excluded-from-envelope",
+            "recorded_at": "2026-09-30T00:00:00Z",
+            "integrity": {"status": "failed"},
+        }
+    ]
+    if canonicalize(envelope_from_target_vector(checkpoint_vector)) != expected:
+        errors.append("activity checkpoints change the canonical envelope target")
+
     with TemporaryDirectory() as directory:
         output = Path(directory)
         report = build_targets(vector_ledger(vector), output)
@@ -121,6 +137,34 @@ def main() -> int:
                 print(f"  - {error}")
         else:
             print(f"OK   target vector {path.relative_to(ROOT)}")
+    lifecycle_vector = json.loads(LIFECYCLE_VECTOR_PATH.read_text(encoding="utf-8"))
+    try:
+        verify_lifecycle_vector(lifecycle_vector)
+        expected = {
+            checkpoint["head_event_id"]: checkpoint["expected"]
+            for checkpoint in lifecycle_vector["checkpoints"]
+        }
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            report = build_targets(load_document(LIFECYCLE_FIXTURE_PATH), output)
+            lifecycle_reports = [
+                item for item in report if item["scope"] == "forecast-lifecycle/v1"
+            ]
+            if len(lifecycle_reports) != 2:
+                raise AssertionError("reference builder did not produce both lifecycle checkpoints")
+            for item in lifecycle_reports:
+                published = expected[item["head_event_id"]]
+                built = Path(item["artifact_path"]).read_bytes()
+                if built.decode("utf-8") != published["canonical_target"]:
+                    raise AssertionError("reference builder lifecycle bytes differ from vector")
+                if item["digest"]["value"] != published["sha256"]:
+                    raise AssertionError("reference builder lifecycle digest differs from vector")
+    except Exception as error:
+        failed = True
+        print(f"FAIL lifecycle vector {LIFECYCLE_VECTOR_PATH.relative_to(ROOT)}")
+        print(f"  - {error}")
+    else:
+        print(f"OK   lifecycle vector {LIFECYCLE_VECTOR_PATH.relative_to(ROOT)}")
     return 1 if failed else 0
 
 

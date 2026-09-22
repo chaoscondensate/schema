@@ -61,7 +61,7 @@
     "supersedes_forecast_id",
     "provenance"
   ],
-  "expected_excluded_forecast_fields": ["lifecycle_events", "integrity"],
+  "expected_excluded_forecast_fields": ["lifecycle_events", "activity_checkpoints", "integrity"],
   "expected": {
     "canonical_envelope": "{\"forecast\":{\"commitment\":{\"commitment_hash\":{\"algorithm\":\"sha-256\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"encryption\":{\"algorithm\":\"chacha20-poly1305\",\"ciphertext\":\"AAAAAAAAAAAAAAAAAAAAAAAA\",\"nonce\":\"AAAAAAAAAAAAAAAA\"},\"scheme\":\"forecast-seal/v2\"},\"forecasted_at\":\"2026-09-02T11:00:00Z\",\"id\":\"f-envelope-sealed-001\",\"provenance\":{\"importer\":{\"name\":\"example-importer\",\"version\":\"1.0.0\"},\"platform\":\"example-platform\",\"remote_object_id\":\"forecast-84\",\"retrieved_at\":\"2026-09-02T11:00:04Z\"},\"public_note\":\"The forecast is sealed pending resolution.\",\"question_revision_id\":\"qr-envelope-sealed-1\",\"recorded_at\":\"2026-09-02T11:00:05Z\",\"supersedes_forecast_id\":\"f-envelope-sealed-000\",\"visibility\":\"sealed\"},\"question\":{\"id\":\"q-envelope-sealed\",\"revision\":{\"domain\":{\"kind\":\"binary\"},\"effective_at\":\"2026-09-01T09:00:00Z\",\"expected_resolution_at\":\"2027-01-01T00:00:00Z\",\"id\":\"qr-envelope-sealed-1\",\"outcome_space\":{\"kind\":\"binary\"},\"recorded_at\":\"2026-09-01T09:00:01Z\",\"resolution_criteria\":\"Resolve YES if the sealed example event is confirmed before 2027.\",\"title\":\"Will the sealed example event occur?\"}},\"schema\":\"forecast-envelope/v2\"}",
     "sha256": "05968dcf3f03eb5d4c2cbb7afee8588be15cc310e4b0077432fed0f8c6fad773"

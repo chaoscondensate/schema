@@ -75,6 +75,17 @@ def main() -> int:
         if not errors:
             failed = True
             print(f"FAIL invalid fixture {case['name']}: unexpectedly accepted")
+        elif "expect_errors" in case:
+            expected_errors = case["expect_errors"]
+            if errors != expected_errors:
+                failed = True
+                print(f"FAIL invalid fixture {case['name']}: wrong rejection")
+                for expected in expected_errors:
+                    print(f"  - expected: {expected}")
+                for error in errors:
+                    print(f"  - actual: {error}")
+            else:
+                print(f"OK   invalid fixture {case['name']}")
         elif case["expect_contains"] not in combined:
             failed = True
             print(f"FAIL invalid fixture {case['name']}: wrong rejection")

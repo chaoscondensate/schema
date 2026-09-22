@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from forecast_crypto import reveal_forecast
+from forecast_crypto import canonicalize, forecast_lifecycle_target, reveal_forecast
 from jsonschema import Draft202012Validator, FormatChecker
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 ONE = Decimal(1)
 CANONICAL_DECIMAL = re.compile(
@@ -30,12 +31,33 @@ CANONICAL_DECIMAL = re.compile(
 )
 
 
+def pointer_join(path: str, token: str | int) -> str:
+    escaped = str(token).replace("~", "~0").replace("/", "~1")
+    return f"{path}/{escaped}" if path else f"/{escaped}"
+
+
+def normalize_pointer(path: str) -> str:
+    """Convert legacy $.items[0].field paths to RFC 6901 JSON Pointers."""
+
+    if not path.startswith("$"):
+        return path
+    pointer = ""
+    for name, bracket in re.findall(r"\.([A-Za-z0-9_*]+)|\[([^]]+)\]", path[1:]):
+        token = name or bracket
+        pointer = pointer_join(pointer, token)
+    return pointer
+
+
 class Problems:
-    def __init__(self) -> None:
+    def __init__(self, locations: dict[str, tuple[int, int]] | None = None) -> None:
         self.items: list[str] = []
+        self.locations = locations or {}
 
     def add(self, path: str, message: str) -> None:
-        self.items.append(f"{path}: {message}")
+        pointer = normalize_pointer(path)
+        location = self.locations.get(pointer)
+        suffix = f" [line {location[0]}, column {location[1]}]" if location else ""
+        self.items.append(f"{pointer or '/'}{suffix}: {message}")
 
     def unique(self, values: list[Any], path: str) -> None:
         seen: set[Any] = set()
@@ -52,6 +74,57 @@ def load_document(path: Path) -> Any:
     return yaml.load(path.read_text(encoding="utf-8"))
 
 
+class DocumentSyntaxError(ValueError):
+    def __init__(self, line: int, column: int) -> None:
+        super().__init__("document syntax is invalid")
+        self.line = line
+        self.column = column
+
+
+def _plain_and_locations(value: Any) -> tuple[Any, dict[str, tuple[int, int]]]:
+    locations: dict[str, tuple[int, int]] = {}
+
+    def convert(node: Any, pointer: str) -> Any:
+        if isinstance(node, dict):
+            result: dict[str, Any] = {}
+            for key, item in node.items():
+                child = pointer_join(pointer, key)
+                try:
+                    line, column = node.lc.value(key)
+                    locations[child] = (line + 1, column + 1)
+                except (AttributeError, KeyError, TypeError, ValueError):
+                    pass
+                result[str(key)] = convert(item, child)
+            return result
+        if isinstance(node, list):
+            result = []
+            for index, item in enumerate(node):
+                child = pointer_join(pointer, index)
+                try:
+                    line, column = node.lc.item(index)
+                    locations[child] = (line + 1, column + 1)
+                except (AttributeError, IndexError, TypeError, ValueError):
+                    pass
+                result.append(convert(item, child))
+            return result
+        return node
+
+    return convert(value, ""), locations
+
+
+def load_document_with_locations(path: Path) -> tuple[Any, dict[str, tuple[int, int]]]:
+    text = path.read_text(encoding="utf-8")
+    yaml = YAML(typ="rt")
+    try:
+        value = yaml.load(text)
+    except YAMLError as error:
+        mark = getattr(error, "problem_mark", None)
+        line = mark.line + 1 if mark else 1
+        column = mark.column + 1 if mark else 1
+        raise DocumentSyntaxError(line, column) from None
+    return _plain_and_locations(value)
+
+
 def parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -59,10 +132,32 @@ def parse_time(value: str) -> datetime:
 def check_schema(instance: Any, schema: dict[str, Any], problems: Problems) -> None:
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     for error in sorted(validator.iter_errors(instance), key=lambda item: list(item.path)):
-        path = "$" + "".join(
-            f"[{part}]" if isinstance(part, int) else f".{part}" for part in error.path
-        )
-        problems.add(path, error.message)
+        path = ""
+        for part in error.path:
+            path = pointer_join(path, part)
+        if error.validator == "required" and isinstance(error.instance, dict):
+            for missing in error.validator_value:
+                if missing not in error.instance:
+                    problems.add(pointer_join(path, missing), "required property is missing")
+            continue
+        if error.validator == "additionalProperties" and isinstance(error.instance, dict):
+            allowed = set(error.schema.get("properties", {}))
+            patterns = [re.compile(item) for item in error.schema.get("patternProperties", {})]
+            for key in error.instance:
+                if key not in allowed and not any(pattern.search(key) for pattern in patterns):
+                    problems.add(pointer_join(path, key), "unknown property is not allowed")
+            continue
+        messages = {
+            "type": "must have the required type",
+            "const": "must equal the required constant",
+            "enum": "must be one of the allowed values",
+            "pattern": "does not match the required pattern",
+            "format": "does not match the required format",
+            "minItems": f"must contain at least {error.validator_value} item(s)",
+            "oneOf": "must match exactly one allowed shape",
+            "not": "contains a property forbidden for this state",
+        }
+        problems.add(path, messages.get(error.validator, "does not satisfy the schema constraint"))
 
 
 def parse_scalar(value: Any, kind: str) -> Any:
@@ -95,7 +190,7 @@ def check_digest(
 ) -> None:
     artifact = repository_root / artifact_path
     if not artifact.is_file():
-        problems.add(path, f"artifact does not exist: {artifact}")
+        problems.add(path, "referenced artifact does not exist")
         return
     actual = hashlib.sha256(artifact.read_bytes()).hexdigest()
     if actual != expected:
@@ -443,24 +538,29 @@ def check_revealed(
             commitment=forecast["commitment"],
             key=bytes.fromhex(forecast["commitment"]["revealed_key"]),
         )
-    except Exception as error:  # cryptographic APIs intentionally expose varied errors
-        problems.add(f"{path}.commitment", f"reveal verification failed: {error}")
+    except Exception:  # cryptographic errors are intentionally redacted from diagnostics
+        problems.add(f"{path}.commitment", "reveal verification failed")
         return
     bundle = payload["bundle"]
-    for field in (
-        "question_revision_id",
-        "forecasted_at",
-        "recorded_at",
-        "representations",
-        "rationale",
-        "key_factors",
-        "comment",
-    ):
-        if forecast.get(field) != bundle.get(field):
+    if forecast.get("representations") != bundle["representations"]:
+        problems.add(f"{path}.representations", "does not match the decrypted sealed bundle")
+    for field in ("rationale", "key_factors", "comment"):
+        if (field in forecast) != (field in bundle):
+            problems.add(
+                f"{path}.{field}",
+                "presence does not match the decrypted sealed bundle",
+            )
+        elif field in forecast and forecast[field] != bundle[field]:
             problems.add(f"{path}.{field}", "does not match the decrypted sealed bundle")
 
 
-def check_lifecycle(events: list[dict[str, Any]], path: str, problems: Problems) -> None:
+def check_lifecycle(
+    events: list[dict[str, Any]],
+    forecasted_at: datetime,
+    forecast_recorded_at: datetime,
+    path: str,
+    problems: Problems,
+) -> None:
     problems.unique([event["id"] for event in events], path)
     active = True
     previous_effective: datetime | None = None
@@ -469,12 +569,25 @@ def check_lifecycle(events: list[dict[str, Any]], path: str, problems: Problems)
         epath = f"{path}[{index}]"
         effective = parse_time(event["effective_at"])
         recorded = parse_time(event["recorded_at"])
+        if effective < forecasted_at:
+            problems.add(
+                f"{epath}.effective_at",
+                "must not precede forecast.forecasted_at",
+            )
         if recorded < effective:
             problems.add(f"{epath}.recorded_at", "must not precede effective_at")
+        if recorded < forecast_recorded_at:
+            problems.add(
+                f"{epath}.recorded_at",
+                "must not precede forecast.recorded_at",
+            )
         if previous_effective and effective < previous_effective:
-            problems.add(epath, "events must be ordered by effective_at")
+            problems.add(f"{epath}.effective_at", "events must be ordered by effective_at")
         if previous_recorded and recorded < previous_recorded:
-            problems.add(epath, "events must be append-only ordered by recorded_at")
+            problems.add(
+                f"{epath}.recorded_at",
+                "events must be append-only ordered by recorded_at",
+            )
         if event["type"] in {"withdrawn", "expired"}:
             if not active:
                 problems.add(f"{epath}.type", "cannot deactivate an inactive forecast")
@@ -484,6 +597,61 @@ def check_lifecycle(events: list[dict[str, Any]], path: str, problems: Problems)
                 problems.add(f"{epath}.type", "cannot reaffirm an active forecast")
             active = True
         previous_effective, previous_recorded = effective, recorded
+
+
+def check_activity_checkpoints(
+    question_id: str,
+    forecast: dict[str, Any],
+    revision: dict[str, Any],
+    repository_root: Path,
+    path: str,
+    problems: Problems,
+) -> None:
+    checkpoints = forecast.get("activity_checkpoints", [])
+    problems.unique([checkpoint["id"] for checkpoint in checkpoints], path)
+    events = forecast.get("lifecycle_events", [])
+    event_indexes = {event["id"]: index for index, event in enumerate(events)}
+    problems.unique([checkpoint["head_event_id"] for checkpoint in checkpoints], path)
+    previous_head_index: int | None = None
+    previous_recorded: datetime | None = None
+    for index, checkpoint in enumerate(checkpoints):
+        cpath = f"{path}[{index}]"
+        head_id = checkpoint["head_event_id"]
+        head_index = event_indexes.get(head_id)
+        if head_index is None:
+            problems.add(f"{cpath}.head_event_id", "must reference a lifecycle event")
+            continue
+        if previous_head_index is not None and head_index <= previous_head_index:
+            problems.add(
+                f"{cpath}.head_event_id",
+                "checkpoints must cover strictly increasing lifecycle prefixes",
+            )
+        checkpoint_recorded = parse_time(checkpoint["recorded_at"])
+        head_recorded = parse_time(events[head_index]["recorded_at"])
+        if checkpoint_recorded < head_recorded:
+            problems.add(
+                f"{cpath}.recorded_at",
+                "must not precede the covered lifecycle head recorded_at",
+            )
+        if previous_recorded and checkpoint_recorded < previous_recorded:
+            problems.add(
+                f"{cpath}.recorded_at",
+                "checkpoints must be append-only ordered by recorded_at",
+            )
+        integrity = checkpoint["integrity"]
+        check_integrity(integrity, repository_root, f"{cpath}.integrity", problems)
+        if "target" in integrity:
+            expected = canonicalize(
+                forecast_lifecycle_target(question_id, forecast, revision, head_id)
+            )
+            expected_digest = hashlib.sha256(expected).hexdigest()
+            if integrity["target"]["digest"]["value"] != expected_digest:
+                problems.add(
+                    f"{cpath}.integrity.target.digest.value",
+                    "does not match the canonical forecast-lifecycle/v1 target",
+                )
+        previous_head_index = head_index
+        previous_recorded = checkpoint_recorded
 
 
 def check_relationships(
@@ -640,7 +808,13 @@ def check_semantics(ledger: dict[str, Any], repository_root: Path, problems: Pro
                     problems,
                 )
             events = forecast.get("lifecycle_events", [])
-            check_lifecycle(events, f"{fpath}.lifecycle_events", problems)
+            check_lifecycle(
+                events,
+                forecasted,
+                recorded,
+                f"{fpath}.lifecycle_events",
+                problems,
+            )
             for event_index, event in enumerate(events):
                 if "provenance" in event:
                     check_provenance(
@@ -651,6 +825,14 @@ def check_semantics(ledger: dict[str, Any], repository_root: Path, problems: Pro
                         problems,
                     )
             check_integrity(forecast["integrity"], repository_root, f"{fpath}.integrity", problems)
+            check_activity_checkpoints(
+                question["id"],
+                forecast,
+                revision,
+                repository_root,
+                f"{fpath}.activity_checkpoints",
+                problems,
+            )
             check_revealed(question, forecast, fpath, problems)
 
         resolution = question.get("resolution")
@@ -716,9 +898,9 @@ def check_semantics(ledger: dict[str, Any], repository_root: Path, problems: Pro
 
 
 def validate(path: Path, schema_path: Path, repository_root: Path) -> list[str]:
-    ledger = load_document(path)
+    ledger, locations = load_document_with_locations(path)
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    problems = Problems()
+    problems = Problems(locations)
     check_schema(ledger, schema, problems)
     if not problems.items:
         check_semantics(ledger, repository_root, problems)
@@ -738,14 +920,23 @@ def main() -> int:
     args = parser.parse_args()
     failed = False
     for document in args.documents:
-        errors = validate(document, args.schema, args.repository_root)
+        try:
+            display_document = document.resolve().relative_to(Path.cwd().resolve()).as_posix()
+        except ValueError:
+            display_document = document.name
+        try:
+            errors = validate(document, args.schema, args.repository_root)
+        except DocumentSyntaxError as error:
+            errors = [
+                f"/ [line {error.line}, column {error.column}]: document syntax is invalid"
+            ]
         if errors:
             failed = True
-            print(f"FAIL {document}")
+            print(f"FAIL {display_document}")
             for error in errors:
                 print(f"  - {error}")
         else:
-            print(f"OK   {document}")
+            print(f"OK   {display_document}")
     return 1 if failed else 0
 
 

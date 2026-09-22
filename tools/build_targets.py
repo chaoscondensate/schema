@@ -9,8 +9,8 @@ from pathlib import Path
 
 from forecast_crypto import (
     canonicalize,
-    public_forecast_envelope,
-    sealed_forecast_envelope,
+    forecast_envelope,
+    forecast_lifecycle_target,
     sha256_ref,
 )
 from validate import load_document
@@ -25,21 +25,41 @@ def build_targets(ledger: dict, output: Path) -> list[dict]:
         revisions = {revision["id"]: revision for revision in question["revisions"]}
         for forecast in question["forecasts"]:
             revision = revisions[forecast["question_revision_id"]]
-            if forecast["visibility"] == "public":
-                envelope = public_forecast_envelope(question["id"], forecast, revision)
-            else:
-                envelope = sealed_forecast_envelope(question["id"], forecast, revision)
+            envelope = forecast_envelope(question["id"], forecast, revision)
             data = canonicalize(envelope)
             path = output / f"{forecast['id']}.json"
             path.write_bytes(data)
             report.append(
                 {
+                    "scope": "forecast-envelope/v2",
                     "question_id": question["id"],
                     "forecast_id": forecast["id"],
                     "artifact_path": path.as_posix(),
                     "digest": sha256_ref(data),
                 }
             )
+            for checkpoint in forecast.get("activity_checkpoints", []):
+                lifecycle = forecast_lifecycle_target(
+                    question["id"],
+                    forecast,
+                    revision,
+                    checkpoint["head_event_id"],
+                )
+                lifecycle_data = canonicalize(lifecycle)
+                lifecycle_path = output / (
+                    f"{forecast['id']}.lifecycle.{checkpoint['head_event_id']}.json"
+                )
+                lifecycle_path.write_bytes(lifecycle_data)
+                report.append(
+                    {
+                        "scope": "forecast-lifecycle/v1",
+                        "question_id": question["id"],
+                        "forecast_id": forecast["id"],
+                        "head_event_id": checkpoint["head_event_id"],
+                        "artifact_path": lifecycle_path.as_posix(),
+                        "digest": sha256_ref(lifecycle_data),
+                    }
+                )
     return report
 
 

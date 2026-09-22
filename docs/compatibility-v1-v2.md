@@ -65,7 +65,7 @@ An automated migration must stop or emit an explicit review item when:
 ## Consumer support policy
 
 Consumers should select behavior from `schema_version`, not feature detection.
-Supporting v1.3.0 and v2.0.1 means validating each document against its own
+Supporting v1.3.0 and v2.1.0 means validating each document against its own
 permanent schema and using the matching envelope/seal profile. There is no
 mixed-version ledger and no v2 envelope around a v1 forecast.
 
@@ -81,10 +81,27 @@ created under v2.0.0 uses that exact tagged contract. The current reference
 tools implement only the corrected v2.0.1 projection; they do not add a dual
 projection or automatic conversion path.
 
+## v2.1.0 pre-adoption cutover
+
+v2.1.0 is intentionally incompatible with v2.0.x and provides no converter or
+compatibility bundle. A client importing v2.1.0 must update schema, semantic
+validator, target builder, crypto implementation, vectors, and diagnostics as
+one exact contract release.
+
+The cutover adds `forecast-lifecycle/v1`, forecast activity checkpoints, and
+forecast-relative lifecycle chronology. It also changes the closed
+`forecast-seal/v2` private bundle: only non-empty `representations` is required;
+`rationale`, `key_factors`, and `comment` are independently optional and their
+presence is authenticated. Earlier `forecast-seal/v2` ciphertext is verified
+only with its exact v2.0.x tagged implementation.
+
+All prior tags remain immutable. Do not relabel a v2.0.x document, seal,
+envelope, or evidence package as v2.1.0.
+
 ## Frozen legacy verification
 
-The legacy manifests record expected hashes for the v1.3.0 schema/seal vector
-and the v2.0.0 schema/seal vector/reference projection implementation. Run:
+The legacy manifests record expected hashes for v1.3.0, v2.0.0, and v2.0.1
+schema, vector, and reference implementation artifacts. Run:
 
 ```bash
 python tools/verify_legacy.py

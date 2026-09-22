@@ -39,7 +39,11 @@ jobs:
           python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
           python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
           python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+          python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
+          python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
           python tools/run_target_tests.py
+          python tools/run_seal_tests.py
+          python tools/run_diagnostic_tests.py
           python tools/verify_legacy.py
 
       - name: Lint reference tools

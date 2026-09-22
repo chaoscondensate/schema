@@ -64,7 +64,7 @@
     "supersedes_forecast_id",
     "provenance"
   ],
-  "expected_excluded_forecast_fields": ["lifecycle_events", "integrity"],
+  "expected_excluded_forecast_fields": ["lifecycle_events", "activity_checkpoints", "integrity"],
   "expected": {
     "canonical_envelope": "{\"forecast\":{\"comment\":\"Initial forecast.\",\"forecasted_at\":\"2026-09-02T10:00:00Z\",\"id\":\"f-envelope-public-001\",\"key_factors\":[\"base rate\",\"leading indicator\"],\"provenance\":{\"importer\":{\"name\":\"example-importer\",\"version\":\"1.0.0\"},\"platform\":\"example-platform\",\"remote_object_id\":\"forecast-42\",\"retrieved_at\":\"2026-09-02T10:00:04Z\"},\"public_note\":\"Visible operational context.\",\"question_revision_id\":\"qr-envelope-public-1\",\"rationale\":\"The base rate favors the event.\",\"recorded_at\":\"2026-09-02T10:00:05Z\",\"representations\":[{\"kind\":\"probability\",\"outcome\":true,\"probability\":\"0.62\"}],\"supersedes_forecast_id\":\"f-envelope-public-000\",\"visibility\":\"public\"},\"question\":{\"id\":\"q-envelope-public\",\"revision\":{\"domain\":{\"kind\":\"binary\"},\"effective_at\":\"2026-09-01T09:00:00Z\",\"expected_resolution_at\":\"2027-01-01T00:00:00Z\",\"id\":\"qr-envelope-public-1\",\"outcome_space\":{\"kind\":\"binary\"},\"recorded_at\":\"2026-09-01T09:00:01Z\",\"resolution_criteria\":\"Resolve YES if the example event is confirmed before 2027.\",\"title\":\"Will the example event occur?\"}},\"schema\":\"forecast-envelope/v2\"}",
     "sha256": "f99fcdc5298be26bee5f38a4c1e742cc96745f2c357727989bcc5f0b5db088c5"

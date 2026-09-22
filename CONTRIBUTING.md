@@ -25,6 +25,12 @@ change in its release notes, and must not rewrite the previous release. Once
 external evidence depends on the affected behavior, the normal major-version and
 new-protocol rule applies instead.
 
+An explicitly commissioned pre-adoption v2 cutover may instead use a minor
+release when compatibility and conversion are deliberately out of scope. The
+release notes must identify every breaking contract and protocol change, freeze
+all earlier tags, publish complete replacement vectors, and state that clients
+must import the new exact release as one unit. `v2.1.0` uses this narrow rule.
+
 ## Development checks
 
 ```bash
@@ -35,7 +41,11 @@ python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v1.jso
 python tools/forecast_crypto.py verify-vector tests/vectors/forecast-seal-v2.json
 python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-public-lifecycle.json
 python tools/forecast_crypto.py verify-target-vector tests/vectors/forecast-envelope-v2-sealed-lifecycle.json
+python tools/forecast_crypto.py verify-lifecycle-vector tests/vectors/forecast-lifecycle-v1.json
+python tools/forecast_crypto.py verify-presence-vector tests/vectors/forecast-seal-v2-presence.json
 python tools/run_target_tests.py
+python tools/run_seal_tests.py
+python tools/run_diagnostic_tests.py
 python tools/verify_legacy.py
 ruff check tools
 ```
